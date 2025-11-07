@@ -20,12 +20,18 @@ const ai = new GoogleGenAI({
 /**
  * Generate an image using Imagen AI
  */
+
+const imageGen4 = "imagen-4.0-generate-001";
+const imageGen3 = "imagen-3.0-generate-002";
+const imageGen4Fast = "imagen-4.0-fast-generate-001";
+const imageGen4Ultra = "imagen-4.0-ultra-generate-001";
+
 async function generateImage(prompt: string): Promise<Buffer | null> {
   console.log(`🎨 Generating image: "${prompt}"`);
   console.time('generation');
 
   const response = await ai.models.generateImages({
-    model: "imagen-4.0-generate-001",
+    model: imageGen4Ultra,
     prompt: `A black and white kids coloring page.
     <image-description>
     ${prompt}

@@ -337,20 +337,6 @@ export async function printImage(
     const jobMatch = stdout.match(/request id is .+-(\d+)/);
     const jobId = jobMatch ? jobMatch[1] : stdout.trim();
 
-    // // Check and resume printer 5 seconds AFTER print job is submitted
-    // // This runs in the background without blocking the return
-    // setTimeout(async () => {
-    //   try {
-    //     const isEnabled = await isPrinterEnabled(printerName);
-    //     if (!isEnabled) {
-    //       await enablePrinter(printerName);
-    //       console.log(`ℹ️  Auto-resumed printer after print: ${printerName}`);
-    //     }
-    //   } catch (error) {
-    //     // Silently fail - don't interrupt the print flow
-    //   }
-    // }, 500);
-
     return jobId;
   } catch (error) {
     throw new Error(
