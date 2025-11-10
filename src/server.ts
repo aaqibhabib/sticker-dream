@@ -31,7 +31,7 @@ async function generateImage(prompt: string): Promise<Buffer | null> {
   console.time('generation');
 
   const response = await ai.models.generateImages({
-    model: imageGen3,
+    model: imageGen4,
     prompt: `A black and white kids coloring page.
     <image-description>
     ${prompt}
