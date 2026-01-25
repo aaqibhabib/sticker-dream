@@ -41,9 +41,57 @@
         <button class="record" style="display: none">Sticker Dream</button>
         <audio id="audio"></audio>
         <p class="transcript">Checking microphone access...</p>
-        <img class="image-display" style="display: none" />
-        <button class="print-btn" style="display: none">Print Sticker</button>
+        <img class="image-display" id="generatedImage" style="display: none" />
+
+        <!-- Template Section (shown after image generation) -->
+        <div class="template-section" id="templateSection" style="display: none">
+          <h3>Click cells to add your sticker</h3>
+          <p class="template-hint">Avery 22877 - 2" Round Labels (12 per sheet)</p>
+
+          <div class="template-grid" id="templateGrid">
+            <!-- 12 cells: 4 columns x 3 rows -->
+            <div class="template-cell" data-cell="0"></div>
+            <div class="template-cell" data-cell="1"></div>
+            <div class="template-cell" data-cell="2"></div>
+            <div class="template-cell" data-cell="3"></div>
+            <div class="template-cell" data-cell="4"></div>
+            <div class="template-cell" data-cell="5"></div>
+            <div class="template-cell" data-cell="6"></div>
+            <div class="template-cell" data-cell="7"></div>
+            <div class="template-cell" data-cell="8"></div>
+            <div class="template-cell" data-cell="9"></div>
+            <div class="template-cell" data-cell="10"></div>
+            <div class="template-cell" data-cell="11"></div>
+          </div>
+
+          <div class="template-actions">
+            <button class="fill-all-btn" id="fillAllBtn">Fill All</button>
+            <button class="clear-all-btn" id="clearAllBtn">Clear All</button>
+          </div>
+
+          <button class="print-btn" id="printTemplateBtn">Print Sheet</button>
+          <button class="new-sticker-btn" id="newStickerBtn">New Sticker</button>
+        </div>
+
         <button class="settings-btn" id="settingsBtn">Change API Key</button>
+      </div>
+
+      <!-- Print Template (hidden, shown only when printing) -->
+      <div class="print-template" id="printTemplate">
+        <div class="print-grid">
+          <div class="print-cell" data-cell="0"></div>
+          <div class="print-cell" data-cell="1"></div>
+          <div class="print-cell" data-cell="2"></div>
+          <div class="print-cell" data-cell="3"></div>
+          <div class="print-cell" data-cell="4"></div>
+          <div class="print-cell" data-cell="5"></div>
+          <div class="print-cell" data-cell="6"></div>
+          <div class="print-cell" data-cell="7"></div>
+          <div class="print-cell" data-cell="8"></div>
+          <div class="print-cell" data-cell="9"></div>
+          <div class="print-cell" data-cell="10"></div>
+          <div class="print-cell" data-cell="11"></div>
+        </div>
       </div>
     </div>
   </body>

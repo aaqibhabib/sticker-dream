@@ -43,7 +43,7 @@ async function generateImageWithGemini(prompt: string): Promise<string | null> {
     ${prompt}`,
     config: {
       numberOfImages: 1,
-      aspectRatio: "9:16",
+      aspectRatio: "1:1", // Square for round labels
     },
   });
 
@@ -84,14 +84,27 @@ const settingsBtn = document.getElementById("settingsBtn") as HTMLButtonElement;
 const recordBtn = document.querySelector(".record") as HTMLButtonElement;
 const transcriptDiv = document.querySelector(".transcript") as HTMLDivElement;
 const audioElement = document.querySelector("#audio") as HTMLAudioElement;
-const imageDisplay = document.querySelector(
-  ".image-display"
-) as HTMLImageElement;
-const printBtn = document.querySelector(".print-btn") as HTMLButtonElement;
+const imageDisplay = document.getElementById("generatedImage") as HTMLImageElement;
+
+// Template elements
+const templateSection = document.getElementById("templateSection") as HTMLDivElement;
+const templateGrid = document.getElementById("templateGrid") as HTMLDivElement;
+const templateCells = templateGrid.querySelectorAll(".template-cell") as NodeListOf<HTMLDivElement>;
+const fillAllBtn = document.getElementById("fillAllBtn") as HTMLButtonElement;
+const clearAllBtn = document.getElementById("clearAllBtn") as HTMLButtonElement;
+const printTemplateBtn = document.getElementById("printTemplateBtn") as HTMLButtonElement;
+const newStickerBtn = document.getElementById("newStickerBtn") as HTMLButtonElement;
+
+// Print template elements
+const printTemplate = document.getElementById("printTemplate") as HTMLDivElement;
+const printCells = printTemplate.querySelectorAll(".print-cell") as NodeListOf<HTMLDivElement>;
 
 let mediaRecorder: MediaRecorder | null = null;
 let audioChunks: Blob[] = [];
 let recordingTimeout: number | null = null;
+
+// Current generated image URL
+let currentImageUrl: string | null = null;
 
 // Check if API key exists and show appropriate UI
 function checkApiKeyAndShowUI(): void {
@@ -277,12 +290,18 @@ async function generateImage(prompt: string) {
       throw new Error("Failed to generate image");
     }
 
-    // Display the image
+    // Store current image URL
+    currentImageUrl = imageUrl;
+
+    // Display the preview image
     imageDisplay.src = imageUrl;
     imageDisplay.style.display = "block";
 
-    // Show the print button
-    printBtn.style.display = "block";
+    // Show template section
+    templateSection.style.display = "flex";
+
+    // Hide record button when template is shown
+    recordBtn.style.display = "none";
 
     transcriptDiv.textContent = prompt;
     console.log("✅ Image generated!");
@@ -296,10 +315,76 @@ async function generateImage(prompt: string) {
   }
 }
 
-// Print the current image using native OS print dialog
-function printImage() {
-  window.print();
+// Template cell click handler - toggle image in cell
+function toggleCell(cell: HTMLDivElement, printCell: HTMLDivElement) {
+  if (!currentImageUrl) return;
+
+  if (cell.classList.contains("filled")) {
+    // Remove image
+    cell.style.backgroundImage = "";
+    cell.classList.remove("filled");
+    printCell.style.backgroundImage = "";
+  } else {
+    // Add image
+    cell.style.backgroundImage = `url(${currentImageUrl})`;
+    cell.classList.add("filled");
+    printCell.style.backgroundImage = `url(${currentImageUrl})`;
+  }
 }
 
-// Print button click handler
-printBtn.addEventListener("click", printImage);
+// Add click handlers to template cells
+templateCells.forEach((cell, index) => {
+  cell.addEventListener("click", () => {
+    toggleCell(cell, printCells[index]);
+  });
+});
+
+// Fill all cells
+fillAllBtn.addEventListener("click", () => {
+  if (!currentImageUrl) return;
+
+  templateCells.forEach((cell, index) => {
+    cell.style.backgroundImage = `url(${currentImageUrl})`;
+    cell.classList.add("filled");
+    printCells[index].style.backgroundImage = `url(${currentImageUrl})`;
+  });
+});
+
+// Clear all cells
+clearAllBtn.addEventListener("click", () => {
+  templateCells.forEach((cell, index) => {
+    cell.style.backgroundImage = "";
+    cell.classList.remove("filled");
+    printCells[index].style.backgroundImage = "";
+  });
+});
+
+// Print template
+printTemplateBtn.addEventListener("click", () => {
+  window.print();
+});
+
+// New sticker - reset and go back to recording
+newStickerBtn.addEventListener("click", () => {
+  // Clear all cells
+  templateCells.forEach((cell, index) => {
+    cell.style.backgroundImage = "";
+    cell.classList.remove("filled");
+    printCells[index].style.backgroundImage = "";
+  });
+
+  // Hide template section
+  templateSection.style.display = "none";
+
+  // Hide preview image
+  imageDisplay.style.display = "none";
+
+  // Show record button
+  recordBtn.style.display = "block";
+
+  // Reset transcript
+  transcriptDiv.textContent = "Press the button and imagine a sticker!";
+
+  // Clear current image
+  currentImageUrl = null;
+});
