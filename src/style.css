@@ -563,8 +563,22 @@ audio {
   display: none;
 }
 
-/* Print Styles - Avery 22877 Template */
+/* Print Styles - Avery 22877 Template
+   Adjust these values to match your specific label sheet:
+   --print-top-margin: distance from page top to first label top
+   --print-left-margin: distance from page left to first label left
+   --print-h-pitch: horizontal center-to-center distance
+   --print-v-pitch: vertical center-to-center distance
+*/
 @media print {
+  :root {
+    --print-top-margin: 0.5in;
+    --print-left-margin: 0.35in;
+    --print-h-pitch: 2.6in;
+    --print-v-pitch: 2.5in;
+    --label-size: 2in;
+  }
+
   /* Hide everything except the print template */
   html, body {
     background: white !important;
@@ -593,29 +607,42 @@ audio {
   }
 
   .print-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 2in);
-    grid-template-rows: repeat(4, 2in);
-    gap: 0;
-    /* Avery 22877 margins: centered horizontally, ~0.5in top */
-    padding-top: 0.5in;
-    padding-left: 1.25in; /* (8.5 - 6) / 2 = 1.25in to center 3 columns */
+    position: relative;
     width: 8.5in;
     height: 11in;
-    box-sizing: border-box;
   }
 
   .print-cell {
-    width: 2in;
-    height: 2in;
+    position: absolute;
+    width: var(--label-size);
+    height: var(--label-size);
     border-radius: 50%;
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    overflow: hidden;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+
+  /* Position each cell - Row 1 */
+  .print-cell[data-cell="0"] { top: var(--print-top-margin); left: var(--print-left-margin); }
+  .print-cell[data-cell="1"] { top: var(--print-top-margin); left: calc(var(--print-left-margin) + var(--print-h-pitch)); }
+  .print-cell[data-cell="2"] { top: var(--print-top-margin); left: calc(var(--print-left-margin) + var(--print-h-pitch) * 2); }
+
+  /* Position each cell - Row 2 */
+  .print-cell[data-cell="3"] { top: calc(var(--print-top-margin) + var(--print-v-pitch)); left: var(--print-left-margin); }
+  .print-cell[data-cell="4"] { top: calc(var(--print-top-margin) + var(--print-v-pitch)); left: calc(var(--print-left-margin) + var(--print-h-pitch)); }
+  .print-cell[data-cell="5"] { top: calc(var(--print-top-margin) + var(--print-v-pitch)); left: calc(var(--print-left-margin) + var(--print-h-pitch) * 2); }
+
+  /* Position each cell - Row 3 */
+  .print-cell[data-cell="6"] { top: calc(var(--print-top-margin) + var(--print-v-pitch) * 2); left: var(--print-left-margin); }
+  .print-cell[data-cell="7"] { top: calc(var(--print-top-margin) + var(--print-v-pitch) * 2); left: calc(var(--print-left-margin) + var(--print-h-pitch)); }
+  .print-cell[data-cell="8"] { top: calc(var(--print-top-margin) + var(--print-v-pitch) * 2); left: calc(var(--print-left-margin) + var(--print-h-pitch) * 2); }
+
+  /* Position each cell - Row 4 */
+  .print-cell[data-cell="9"] { top: calc(var(--print-top-margin) + var(--print-v-pitch) * 3); left: var(--print-left-margin); }
+  .print-cell[data-cell="10"] { top: calc(var(--print-top-margin) + var(--print-v-pitch) * 3); left: calc(var(--print-left-margin) + var(--print-h-pitch)); }
+  .print-cell[data-cell="11"] { top: calc(var(--print-top-margin) + var(--print-v-pitch) * 3); left: calc(var(--print-left-margin) + var(--print-h-pitch) * 2); }
 
   @page {
     margin: 0;
