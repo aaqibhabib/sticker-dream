@@ -563,21 +563,16 @@ audio {
 /* Print Styles - Avery 22877 Template */
 @media print {
   /* Hide everything except the print template */
-  body {
+  html, body {
     background: white !important;
     padding: 0 !important;
     margin: 0 !important;
+    width: 8.5in !important;
+    height: 11in !important;
+    overflow: visible !important;
   }
 
-  .container,
-  .main-app,
-  .api-key-setup,
-  .template-section,
-  .record,
-  .transcript,
-  .settings-btn,
-  .image-display,
-  audio {
+  .container {
     display: none !important;
   }
 
@@ -588,9 +583,10 @@ audio {
     height: 11in;
     padding: 0;
     margin: 0;
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
+    background: white;
   }
 
   .print-grid {
@@ -614,10 +610,12 @@ audio {
     background-position: center;
     background-repeat: no-repeat;
     overflow: hidden;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   @page {
     margin: 0;
-    size: letter;
+    size: letter portrait;
   }
 }
