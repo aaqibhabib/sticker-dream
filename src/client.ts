@@ -1,4 +1,68 @@
 import { pipeline } from "@huggingface/transformers";
+import { GoogleGenAI } from "@google/genai";
+
+// API Key Management
+const API_KEY_STORAGE_KEY = "sticker-dream-gemini-api-key";
+
+function getStoredApiKey(): string | null {
+  return localStorage.getItem(API_KEY_STORAGE_KEY);
+}
+
+function setStoredApiKey(key: string): void {
+  localStorage.setItem(API_KEY_STORAGE_KEY, key);
+}
+
+function clearStoredApiKey(): void {
+  localStorage.removeItem(API_KEY_STORAGE_KEY);
+}
+
+// Google AI client (initialized when API key is available)
+let ai: GoogleGenAI | null = null;
+
+function initializeAI(apiKey: string): void {
+  ai = new GoogleGenAI({ apiKey });
+}
+
+// Image generation using Gemini Imagen
+const imageGen4 = "imagen-4.0-generate-001";
+
+async function generateImageWithGemini(prompt: string): Promise<string | null> {
+  if (!ai) {
+    throw new Error("API key not configured");
+  }
+
+  console.log(`🎨 Generating image: "${prompt}"`);
+  console.time("generation");
+
+  const response = await ai.models.generateImages({
+    model: imageGen4,
+    prompt: `A black and white kids coloring page.
+    <image-description>
+    ${prompt}
+    </image-description>
+    ${prompt}`,
+    config: {
+      numberOfImages: 1,
+      aspectRatio: "9:16",
+    },
+  });
+
+  console.timeEnd("generation");
+
+  if (!response.generatedImages || response.generatedImages.length === 0) {
+    console.error("No images generated");
+    return null;
+  }
+
+  const imgBytes = response.generatedImages[0].image?.imageBytes;
+  if (!imgBytes) {
+    console.error("No image bytes returned");
+    return null;
+  }
+
+  // Convert base64 to data URL for browser display
+  return `data:image/png;base64,${imgBytes}`;
+}
 
 // Initialize the transcriber
 const transcriber = await pipeline(
@@ -12,6 +76,11 @@ const transcriber = await pipeline(
 );
 
 // Get DOM elements
+const apiKeySetup = document.getElementById("apiKeySetup") as HTMLDivElement;
+const mainApp = document.getElementById("mainApp") as HTMLDivElement;
+const apiKeyInput = document.getElementById("apiKeyInput") as HTMLInputElement;
+const saveApiKeyBtn = document.getElementById("saveApiKey") as HTMLButtonElement;
+const settingsBtn = document.getElementById("settingsBtn") as HTMLButtonElement;
 const recordBtn = document.querySelector(".record") as HTMLButtonElement;
 const transcriptDiv = document.querySelector(".transcript") as HTMLDivElement;
 const audioElement = document.querySelector("#audio") as HTMLAudioElement;
@@ -23,6 +92,49 @@ const printBtn = document.querySelector(".print-btn") as HTMLButtonElement;
 let mediaRecorder: MediaRecorder | null = null;
 let audioChunks: Blob[] = [];
 let recordingTimeout: number | null = null;
+
+// Check if API key exists and show appropriate UI
+function checkApiKeyAndShowUI(): void {
+  const apiKey = getStoredApiKey();
+  if (apiKey) {
+    initializeAI(apiKey);
+    apiKeySetup.style.display = "none";
+    mainApp.style.display = "flex";
+    checkMicrophoneAccess();
+    resetRecorder();
+  } else {
+    apiKeySetup.style.display = "block";
+    mainApp.style.display = "none";
+  }
+}
+
+// Save API key handler
+saveApiKeyBtn.addEventListener("click", () => {
+  const apiKey = apiKeyInput.value.trim();
+  if (!apiKey) {
+    alert("Please enter an API key");
+    return;
+  }
+  setStoredApiKey(apiKey);
+  initializeAI(apiKey);
+  apiKeyInput.value = "";
+  checkApiKeyAndShowUI();
+});
+
+// Allow Enter key to save
+apiKeyInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    saveApiKeyBtn.click();
+  }
+});
+
+// Settings button to change API key
+settingsBtn.addEventListener("click", () => {
+  if (confirm("Do you want to change your API key?")) {
+    clearStoredApiKey();
+    checkApiKeyAndShowUI();
+  }
+});
 
 // Check for microphone access before showing the button
 async function checkMicrophoneAccess() {
@@ -73,7 +185,7 @@ async function resetRecorder() {
     recordBtn.textContent = "Dreaming Up...";
 
     const abortWords = ["BLANK", "NO IMAGE", "NO STICKER", "CANCEL", "ABORT", "START OVER"];
-    if(!text || abortWords.some(word => text.toUpperCase().includes(word))) {
+    if (!text || abortWords.some((word) => text.toUpperCase().includes(word))) {
       transcriptDiv.textContent = "No image generated.";
       recordBtn.classList.remove("loading");
       recordBtn.textContent = "Cancelled";
@@ -91,13 +203,11 @@ async function resetRecorder() {
     recordBtn.classList.remove("loading");
     recordBtn.textContent = "Sticker Dream";
     resetRecorder();
-
   };
 }
 
-// Check microphone access on load
-checkMicrophoneAccess();
-resetRecorder();
+// Initialize on load
+checkApiKeyAndShowUI();
 
 // Start recording when button is pressed down
 recordBtn.addEventListener("pointerdown", async () => {
@@ -110,7 +220,7 @@ recordBtn.addEventListener("pointerdown", async () => {
   recordBtn.classList.add("recording");
   recordBtn.textContent = "Listening...";
 
-  // Auto-stop after 5 seconds
+  // Auto-stop after 15 seconds
   recordingTimeout = window.setTimeout(() => {
     if (mediaRecorder && mediaRecorder.state === "recording") {
       mediaRecorder.stop();
@@ -161,20 +271,11 @@ async function generateImage(prompt: string) {
   try {
     transcriptDiv.textContent = `${prompt}\n\nGenerating...`;
 
-    const response = await fetch("/api/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ prompt }),
-    });
+    const imageUrl = await generateImageWithGemini(prompt);
 
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.statusText}`);
+    if (!imageUrl) {
+      throw new Error("Failed to generate image");
     }
-
-    const blob = await response.blob();
-    const imageUrl = URL.createObjectURL(blob);
 
     // Display the image
     imageDisplay.src = imageUrl;

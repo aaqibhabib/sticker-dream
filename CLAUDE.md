@@ -2,24 +2,27 @@
 
 ## Project Overview
 
-**Sticker Dream** is a voice-activated sticker printer application that uses AI to create coloring page stickers. Users press and hold a button, speak a description, and the system generates a black-and-white coloring page that can be printed via the native OS print dialog.
+**Sticker Dream** is a voice-activated sticker generator that uses AI to create coloring page stickers. Users press and hold a button, speak a description, and the system generates a black-and-white coloring page that can be printed via the native OS print dialog.
+
+**This is a frontend-only application** - no backend server required. Users provide their own Google Gemini API key.
 
 **Author:** Wes Bos | **License:** MIT
 
 ### Core Workflow
-1. User holds button and speaks (max 15 seconds)
-2. Whisper (Hugging Face Transformers) transcribes voice to text in browser
-3. Google Gemini Imagen AI generates a coloring page image
-4. Image displays in browser with a "Print Sticker" button
-5. User clicks print button to open native OS print dialog (works on desktop and mobile)
+1. User enters their Gemini API key (stored in localStorage)
+2. User holds button and speaks (max 15 seconds)
+3. Whisper (Hugging Face Transformers) transcribes voice to text in browser
+4. Google Gemini Imagen AI generates a coloring page image (browser-side)
+5. Image displays with a "Print Sticker" button
+6. User clicks print button to open native OS print dialog
 
 ## Tech Stack
 
 - **Frontend:** TypeScript, Vite, vanilla DOM
-- **Backend:** Node.js with Hono framework
 - **AI Services:** Google Gemini API (Imagen 4.0), Hugging Face Transformers (Whisper)
 - **Package Manager:** pnpm 9.10.0
 - **Printing:** Native browser print dialog (`window.print()`)
+- **Storage:** localStorage for API key persistence
 
 ## Commands
 
@@ -27,148 +30,126 @@
 # Install dependencies
 pnpm install
 
-# Start backend server (port 3000) - auto-reloads on changes
-pnpm server
-
-# Start frontend dev server (port 7767) - proxies /api to backend
+# Start development server (port 7767)
 pnpm dev
-```
 
-**Note:** Run both `pnpm server` and `pnpm dev` simultaneously for development.
+# Build for production
+pnpm build
+
+# Preview production build
+pnpm preview
+```
 
 ## Project Structure
 
 ```
 sticker-dream/
 ├── src/
-│   ├── client.ts      # Frontend: microphone, recording, transcription, print trigger
-│   ├── server.ts      # Backend: Hono server, Gemini API, image generation
-│   ├── print.ts       # (Legacy) CUPS printer utilities - not currently used
-│   ├── style.css      # Styling: pastel colors, Pixelify Sans font, print styles
+│   ├── client.ts      # All app logic: API key mgmt, voice, transcription, image gen
+│   ├── style.css      # Styling: pastel colors, API key UI, print styles
+│   ├── server.ts      # (Legacy) Not used - kept for reference
+│   ├── print.ts       # (Legacy) CUPS printer utilities - not used
 │   └── sounds/        # Audio feedback: press.mp3, loading.mp3, finished.wav
-├── index.html         # PWA entry point, minimal DOM structure
+├── index.html         # PWA entry point with API key setup UI
 ├── manifest.json      # PWA manifest (standalone mode, portrait orientation)
-├── vite.config.ts     # Vite config: port 7767, API proxy to :3000
+├── vite.config.ts     # Vite config: port 7767
 ├── tsconfig.json      # TypeScript: ESNext, strict mode
-└── package.json       # Dependencies and scripts
+└── package.json       # Frontend-only dependencies
 ```
 
 ## Key Components
 
 ### Frontend (`src/client.ts`)
-- Uses Web Audio API's `MediaRecorder` for voice capture (WebM format)
-- Initializes Whisper model on page load for speech-to-text
-- Manages UI states: recording → transcribing → generating → ready to print
-- Handles cancel keywords: "BLANK", "NO IMAGE", "CANCEL", "ABORT", "START OVER"
-- Events: `pointerdown`/`pointerup` for touch and mouse support
-- Print button triggers `window.print()` for native OS print dialog
+- **API Key Management**: Stores/retrieves Gemini API key from localStorage
+- **Google Gemini Integration**: Direct browser-side calls to Imagen 4.0
+- **Speech Recognition**: Uses Whisper via Hugging Face Transformers
+- **UI State Management**: recording → transcribing → generating → ready to print
+- **Cancel Keywords**: "BLANK", "NO IMAGE", "CANCEL", "ABORT", "START OVER"
+- **Print**: Triggers `window.print()` for native OS print dialog
 
-### Backend (`src/server.ts`)
-- Hono server on port 3000 with CORS enabled
-- `POST /api/generate` - accepts `{ prompt }`, returns PNG image buffer
-- Enhances prompts with coloring page context for Gemini
-- Generates 9:16 aspect ratio images
+### Styling (`src/style.css`)
+- API key setup form with retro styling
+- Settings button to change API key
+- Print styles hide all UI except the image
 
-### Printer Module (`src/print.ts`) - Legacy
-- Not currently used (kept for reference)
-- Contains macOS CUPS utilities for direct USB printing
-- Can be deleted or re-enabled if direct printing is needed
+## API Key Setup
 
-## Environment Variables
+Users must provide their own Google Gemini API key:
+1. Get a free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+2. Enter the key in the setup screen
+3. Key is stored in browser localStorage
+4. Click "Change API Key" button to update
 
-Create a `.env` file in the project root:
-
-```
-GEMINI_API_KEY=your_google_gemini_api_key
-```
+**Security Note**: API key is stored in browser localStorage. This is suitable for personal use but not for shared/public deployments.
 
 ## Code Conventions
 
 ### TypeScript
 - Strict mode enabled, ESNext target
 - Async/await throughout
-- Named exports for utilities
-- Type interfaces for printer options and data structures
+- All AI calls happen client-side
 
 ### Error Handling
 - Try-catch blocks with descriptive messages
-- Console logs with emoji prefixes for debugging (🎨, ✅, ⚠️, 🚀)
-- Graceful degradation: image displays even if printing fails
+- Console logs with emoji prefixes for debugging (🎨, ✅)
+- User-friendly error alerts
 
 ### UI/UX Patterns
-- Progressive enhancement: checks permissions before showing UI
+- Progressive disclosure: API key setup → main app
 - Button text updates through workflow states
 - 15-second auto-stop for recordings (safety limit)
-- Touch-optimized with large tap targets (50px padding)
+- Touch-optimized with large tap targets
 
 ### Styling
 - Pastel color palette: pink (#ffb3d9), green (#b4e7ce), blue (#c2e7ff), yellow (#fff5b8)
-- Pixelify Sans font (Google Fonts) for pixelated aesthetic
+- Pixelify Sans font (Google Fonts)
 - CSS animations: `.recording` (pulse), `.loading` (breathing)
-- Mobile-first with safe area insets for notched devices
-- Print styles (`@media print`): hides UI, shows only the image for clean printing
+- Print styles (`@media print`): hides UI, shows only the image
 
 ## Dependencies
 
 | Package | Purpose |
 |---------|---------|
-| `@google/genai` | Google Gemini API client (Imagen) |
-| `@huggingface/transformers` | Whisper speech-to-text (browser-side) |
-| `hono` / `@hono/node-server` | Lightweight web framework |
+| `@google/genai` | Google Gemini API client (browser-compatible) |
+| `@huggingface/transformers` | Whisper speech-to-text (runs in browser) |
 | `vite` | Build tool and dev server |
 
-**Unused:** `openai` package is installed but not currently used.
+## Deployment
 
-## Development Notes
+This is a static site that can be deployed anywhere:
+- **GitHub Pages**: `pnpm build` then deploy `dist/`
+- **Netlify/Vercel**: Connect repo, build command `pnpm build`
+- **Any static host**: Upload contents of `dist/` folder
 
 ### HTTPS Requirement
 - Microphone access requires secure origin (HTTPS)
-- Use Cloudflare Tunnels for remote/mobile access
-- Local development works via localhost
+- localhost works for development
+- Production deployment must be HTTPS
 
-### Browser APIs
-- `MediaRecorder` (Web Audio API)
-- `navigator.mediaDevices.getUserMedia()` (microphone access)
-- Fetch API for backend communication
+## Browser APIs Used
+- `MediaRecorder` (Web Audio API) - voice capture
+- `navigator.mediaDevices.getUserMedia()` - microphone access
+- `localStorage` - API key persistence
+- `window.print()` - native print dialog
 
-### Platform Support
-- Printing works on any platform via native OS print dialog
-- Desktop: Windows, macOS, Linux (any printer the OS can see)
-- Mobile: iOS and Android (supports AirPrint, Google Cloud Print, etc.)
-- No direct USB/Bluetooth printer access required
-
-### PWA Support
-- Installable as standalone app
-- Portrait orientation locked
-- Apple touch icons configured (192px, 512px)
-
-## Vite Configuration
-
-- Dev server port: 7767
-- Network accessible (`host: true`)
-- Allowed hosts: `local.wesbos.com`
-- API proxy: `/api/*` → `http://localhost:3000`
-
-## Testing Considerations
-
-- No automated tests in codebase
-- Manual testing requires:
-  - Microphone access (browser permission)
-  - Any printer accessible via OS (for print testing)
-  - Valid Gemini API key
+## Platform Support
+- **Desktop**: Windows, macOS, Linux (any modern browser)
+- **Mobile**: iOS Safari, Android Chrome
+- **Printing**: Any printer accessible via OS print dialog
 
 ## Common Tasks
 
+### Change the image model
+Edit `src/client.ts`, find `imageGen4` constant and change to another model ID.
+
 ### Add a new cancel keyword
-Edit `src/client.ts`, find the cancel words array and add the new keyword (uppercase).
+Edit `src/client.ts`, find the `abortWords` array and add the new keyword.
 
 ### Change image aspect ratio
-Edit `src/server.ts`, modify the `aspectRatio` parameter in the Gemini API call.
+Edit `src/client.ts`, modify `aspectRatio` in the `generateImageWithGemini` function.
 
 ### Adjust recording timeout
 Edit `src/client.ts`, find the `setTimeout` with 15000ms and change the duration.
 
-### Add new sound effect
-1. Add audio file to `src/sounds/`
-2. Create `Audio` element in `src/client.ts`
-3. Call `.play()` at appropriate state transition
+### Clear stored API key (for testing)
+Open browser DevTools → Application → Local Storage → Delete `sticker-dream-gemini-api-key`

@@ -5,12 +5,6 @@ export default defineConfig({
     port: 7767,
     host: true,
     allowedHosts: ['local.wesbos.com'],
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-      },
-    },
   },
 });
 
