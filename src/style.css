@@ -464,11 +464,11 @@ audio {
   font-size: 14px;
 }
 
-/* Template Grid - Visual representation of Avery 22877 */
+/* Template Grid - Visual representation of Avery 22877 (portrait: 3 cols x 4 rows) */
 .template-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(3, 1fr);
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(4, 1fr);
   gap: 10px;
   background: white;
   border: 4px solid var(--dark-text);
@@ -591,12 +591,12 @@ audio {
 
   .print-grid {
     display: grid;
-    grid-template-columns: repeat(4, 2in);
-    grid-template-rows: repeat(3, 2in);
+    grid-template-columns: repeat(3, 2in);
+    grid-template-rows: repeat(4, 2in);
     gap: 0;
-    /* Avery 22877 margins: ~0.25in left, ~0.5in top */
+    /* Avery 22877 margins: centered horizontally, ~0.5in top */
     padding-top: 0.5in;
-    padding-left: 0.25in;
+    padding-left: 1.25in; /* (8.5 - 6) / 2 = 1.25in to center 3 columns */
     width: 8.5in;
     height: 11in;
     box-sizing: border-box;
