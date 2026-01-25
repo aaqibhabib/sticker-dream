@@ -27,10 +27,24 @@
   </head>
   <body>
     <div class="container">
-      <button class="record" style="display: none">Sticker Dream</button>
-      <audio id="audio"></audio>
-      <p class="transcript">Checking microphone access...</p>
-      <img class="image-display" style="display: none" />
+      <!-- API Key Setup -->
+      <div class="api-key-setup" id="apiKeySetup">
+        <h2>Setup Required</h2>
+        <p>Enter your Google Gemini API key to get started.</p>
+        <p class="api-key-hint">Get one free at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a></p>
+        <input type="password" id="apiKeyInput" placeholder="Enter your Gemini API key" />
+        <button id="saveApiKey">Save Key</button>
+      </div>
+
+      <!-- Main App (hidden until API key is set) -->
+      <div class="main-app" id="mainApp" style="display: none">
+        <button class="record" style="display: none">Sticker Dream</button>
+        <audio id="audio"></audio>
+        <p class="transcript">Checking microphone access...</p>
+        <img class="image-display" style="display: none" />
+        <button class="print-btn" style="display: none">Print Sticker</button>
+        <button class="settings-btn" id="settingsBtn">Change API Key</button>
+      </div>
     </div>
   </body>
 </html>
