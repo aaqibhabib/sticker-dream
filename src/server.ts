@@ -2,15 +2,12 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { cors } from 'hono/cors';
 import { GoogleGenAI } from "@google/genai";
-import { printToUSB, watchAndResumePrinters } from './print.ts';
 
 const app = new Hono();
 const PORT = 3000;
 
 // Enable CORS for Vite dev server
 app.use('/*', cors());
-
-watchAndResumePrinters();
 
 // Initialize Google AI
 const ai = new GoogleGenAI({
@@ -75,18 +72,6 @@ app.post('/api/generate', async (c) => {
 
     if (!buffer) {
       return c.json({ error: 'Failed to generate image' }, 500);
-    }
-
-    // Print the image
-    try {
-      const printResult = await printToUSB(buffer, {
-        fitToPage: true,
-        copies: 1
-      });
-      console.log(`✅ Print job submitted to ${printResult.printerName}`);
-    } catch (printError) {
-      console.warn('⚠️ Printing failed:', printError);
-      // Continue even if printing fails - still return the image
     }
 
     // Send the image back to the client

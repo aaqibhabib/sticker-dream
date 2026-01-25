@@ -319,3 +319,71 @@ audio {
   -moz-user-select: none;
   -ms-user-select: none;
 }
+
+/* Print Button */
+.print-btn {
+  font-size: 32px;
+  padding: 30px 50px;
+  background: var(--pastel-yellow);
+  color: var(--dark-text);
+  border: 6px solid var(--dark-text);
+  border-radius: 15px;
+  cursor: pointer;
+  font-weight: 700;
+  text-transform: uppercase;
+  box-shadow: 6px 6px 0 var(--dark-text);
+  transition: all 0.1s ease;
+  margin-top: 20px;
+}
+
+.print-btn:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 8px 8px 0 var(--dark-text);
+}
+
+.print-btn:active {
+  transform: translate(3px, 3px);
+  box-shadow: 3px 3px 0 var(--dark-text);
+}
+
+/* Print Styles - Only show the image when printing */
+@media print {
+  /* Hide everything except the image */
+  body {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .container {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .record,
+  .transcript,
+  .print-btn,
+  audio {
+    display: none !important;
+  }
+
+  .image-display {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    page-break-inside: avoid;
+  }
+
+  @page {
+    margin: 0;
+    size: auto;
+  }
+}

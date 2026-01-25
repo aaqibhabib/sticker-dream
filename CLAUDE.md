@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Sticker Dream** is a voice-activated sticker printer application that uses AI to create coloring page stickers. Users press and hold a button, speak a description, and the system generates a black-and-white coloring page that prints to a USB thermal printer.
+**Sticker Dream** is a voice-activated sticker printer application that uses AI to create coloring page stickers. Users press and hold a button, speak a description, and the system generates a black-and-white coloring page that can be printed via the native OS print dialog.
 
 **Author:** Wes Bos | **License:** MIT
 
@@ -10,7 +10,8 @@
 1. User holds button and speaks (max 15 seconds)
 2. Whisper (Hugging Face Transformers) transcribes voice to text in browser
 3. Google Gemini Imagen AI generates a coloring page image
-4. Image displays in browser and prints to connected USB thermal printer
+4. Image displays in browser with a "Print Sticker" button
+5. User clicks print button to open native OS print dialog (works on desktop and mobile)
 
 ## Tech Stack
 
@@ -18,7 +19,7 @@
 - **Backend:** Node.js with Hono framework
 - **AI Services:** Google Gemini API (Imagen 4.0), Hugging Face Transformers (Whisper)
 - **Package Manager:** pnpm 9.10.0
-- **Printing:** macOS CUPS (lpstat, lp commands)
+- **Printing:** Native browser print dialog (`window.print()`)
 
 ## Commands
 
@@ -40,10 +41,10 @@ pnpm dev
 ```
 sticker-dream/
 ├── src/
-│   ├── client.ts      # Frontend: microphone, recording, transcription, UI state
+│   ├── client.ts      # Frontend: microphone, recording, transcription, print trigger
 │   ├── server.ts      # Backend: Hono server, Gemini API, image generation
-│   ├── print.ts       # Printer utilities: CUPS commands, USB printer detection
-│   ├── style.css      # Styling: pastel colors, Pixelify Sans font, animations
+│   ├── print.ts       # (Legacy) CUPS printer utilities - not currently used
+│   ├── style.css      # Styling: pastel colors, Pixelify Sans font, print styles
 │   └── sounds/        # Audio feedback: press.mp3, loading.mp3, finished.wav
 ├── index.html         # PWA entry point, minimal DOM structure
 ├── manifest.json      # PWA manifest (standalone mode, portrait orientation)
@@ -57,24 +58,21 @@ sticker-dream/
 ### Frontend (`src/client.ts`)
 - Uses Web Audio API's `MediaRecorder` for voice capture (WebM format)
 - Initializes Whisper model on page load for speech-to-text
-- Manages UI states: recording → transcribing → generating → printing
+- Manages UI states: recording → transcribing → generating → ready to print
 - Handles cancel keywords: "BLANK", "NO IMAGE", "CANCEL", "ABORT", "START OVER"
 - Events: `pointerdown`/`pointerup` for touch and mouse support
+- Print button triggers `window.print()` for native OS print dialog
 
 ### Backend (`src/server.ts`)
 - Hono server on port 3000 with CORS enabled
 - `POST /api/generate` - accepts `{ prompt }`, returns PNG image buffer
 - Enhances prompts with coloring page context for Gemini
 - Generates 9:16 aspect ratio images
-- Background printer watcher auto-resumes paused printers
 
-### Printer Module (`src/print.ts`)
-- macOS CUPS only (uses lpstat, lp, cupsenable, cancel commands)
-- Key functions:
-  - `getAllPrinters()` / `getUSBPrinters()` - list available printers
-  - `printToUSB(imageBuffer, options)` - print to first USB printer
-  - `watchAndResumePrinters()` - background watcher (1s interval)
-- Creates temp files for printing, auto-cleans up
+### Printer Module (`src/print.ts`) - Legacy
+- Not currently used (kept for reference)
+- Contains macOS CUPS utilities for direct USB printing
+- Can be deleted or re-enabled if direct printing is needed
 
 ## Environment Variables
 
@@ -108,6 +106,7 @@ GEMINI_API_KEY=your_google_gemini_api_key
 - Pixelify Sans font (Google Fonts) for pixelated aesthetic
 - CSS animations: `.recording` (pulse), `.loading` (breathing)
 - Mobile-first with safe area insets for notched devices
+- Print styles (`@media print`): hides UI, shows only the image for clean printing
 
 ## Dependencies
 
@@ -132,10 +131,11 @@ GEMINI_API_KEY=your_google_gemini_api_key
 - `navigator.mediaDevices.getUserMedia()` (microphone access)
 - Fetch API for backend communication
 
-### Platform Limitations
-- Printing only works on macOS (CUPS commands)
-- USB thermal printers supported; Bluetooth untested
-- iOS Safari doesn't support WebUSB/WebSerial
+### Platform Support
+- Printing works on any platform via native OS print dialog
+- Desktop: Windows, macOS, Linux (any printer the OS can see)
+- Mobile: iOS and Android (supports AirPrint, Google Cloud Print, etc.)
+- No direct USB/Bluetooth printer access required
 
 ### PWA Support
 - Installable as standalone app
@@ -154,7 +154,7 @@ GEMINI_API_KEY=your_google_gemini_api_key
 - No automated tests in codebase
 - Manual testing requires:
   - Microphone access (browser permission)
-  - USB thermal printer connected (for print testing)
+  - Any printer accessible via OS (for print testing)
   - Valid Gemini API key
 
 ## Common Tasks

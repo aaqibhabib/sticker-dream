@@ -18,6 +18,7 @@ const audioElement = document.querySelector("#audio") as HTMLAudioElement;
 const imageDisplay = document.querySelector(
   ".image-display"
 ) as HTMLImageElement;
+const printBtn = document.querySelector(".print-btn") as HTMLButtonElement;
 
 let mediaRecorder: MediaRecorder | null = null;
 let audioChunks: Blob[] = [];
@@ -39,10 +40,6 @@ async function checkMicrophoneAccess() {
       "❌ Microphone access required. Please enable microphone permissions in your browser settings.";
     recordBtn.style.display = "none";
   }
-}
-
-function wait(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function resetRecorder() {
@@ -87,17 +84,12 @@ async function resetRecorder() {
       return;
     }
 
-    recordBtn.textContent = "Sending to Printer...";
-    await wait(3000);
-    recordBtn.textContent = "Printing...";
-    await wait(1500);
+    // Generate the image
+    await generateImage(text);
 
     // Stop loading state
     recordBtn.classList.remove("loading");
-    recordBtn.textContent = "Printed!";
-    setTimeout(() => {
-      recordBtn.textContent = "Sticker Dream";
-    }, 1000);
+    recordBtn.textContent = "Sticker Dream";
     resetRecorder();
 
   };
@@ -159,15 +151,15 @@ recordBtn.addEventListener("contextmenu", (e) => {
   e.preventDefault();
 });
 
-// Generate and print image from transcript
-async function generateAndPrint(prompt: string) {
+// Generate image from transcript
+async function generateImage(prompt: string) {
   if (!prompt || prompt === "Transcribing...") {
     console.error("No valid prompt to generate");
     return;
   }
 
   try {
-    transcriptDiv.textContent = `${prompt}\n\nGenerating & Printing...`;
+    transcriptDiv.textContent = `${prompt}\n\nGenerating...`;
 
     const response = await fetch("/api/generate", {
       method: "POST",
@@ -188,8 +180,11 @@ async function generateAndPrint(prompt: string) {
     imageDisplay.src = imageUrl;
     imageDisplay.style.display = "block";
 
+    // Show the print button
+    printBtn.style.display = "block";
+
     transcriptDiv.textContent = prompt;
-    console.log("✅ Image generated and printed!");
+    console.log("✅ Image generated!");
   } catch (error) {
     console.error("Error:", error);
     transcriptDiv.textContent = `${prompt}\n\nError: Failed to generate image`;
@@ -199,3 +194,11 @@ async function generateAndPrint(prompt: string) {
     );
   }
 }
+
+// Print the current image using native OS print dialog
+function printImage() {
+  window.print();
+}
+
+// Print button click handler
+printBtn.addEventListener("click", printImage);
