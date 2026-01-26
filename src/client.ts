@@ -111,6 +111,7 @@ const printFullPageBtn = document.getElementById("printFullPageBtn") as HTMLButt
 // Print template elements
 const printTemplate = document.getElementById("printTemplate") as HTMLDivElement;
 const printCells = printTemplate.querySelectorAll(".print-cell") as NodeListOf<HTMLDivElement>;
+const printFullpage = document.getElementById("printFullpage") as HTMLDivElement;
 const printFullpageImage = document.getElementById("printFullpageImage") as HTMLImageElement;
 
 // Current print mode: 'fullpage' or 'sticker'

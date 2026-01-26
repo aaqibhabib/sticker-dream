@@ -1049,15 +1049,32 @@ audio {
     margin: 0 !important;
     width: 8.5in !important;
     height: 11in !important;
-    overflow: visible !important;
+    overflow: hidden !important;
+  }
+
+  /* Disable grid layout and hide all UI during print */
+  .main-app {
+    display: none !important;
   }
 
   .container {
     display: none !important;
   }
 
+  /* Ensure all UI elements are hidden */
+  .settings-btn,
+  .refresh-btn,
+  .record,
+  .transcript,
+  .image-display,
+  .template-section,
+  .api-key-setup {
+    display: none !important;
+  }
+
   /* ========== FULL PAGE PRINT MODE ========== */
   .print-fullpage {
+    display: block !important;
     width: 8.5in !important;
     height: 11in !important;
     padding: 0 !important;
@@ -1066,8 +1083,9 @@ audio {
     top: 0 !important;
     left: 0 !important;
     background: white !important;
-    page-break-after: avoid;
-    page-break-inside: avoid;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    page-break-before: avoid !important;
   }
 
   .print-fullpage-image {
@@ -1078,13 +1096,16 @@ audio {
     -webkit-print-color-adjust: exact !important;
     color-adjust: exact !important;
     print-color-adjust: exact !important;
-    page-break-inside: avoid;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
     opacity: 1 !important;
     visibility: visible !important;
   }
 
   /* ========== STICKER SHEET PRINT MODE ========== */
   .print-template {
+    display: block !important;
     width: 8.5in !important;
     height: 11in !important;
     padding: 0 !important;
@@ -1093,14 +1114,16 @@ audio {
     top: 0 !important;
     left: 0 !important;
     background: white !important;
-    page-break-after: avoid;
-    page-break-inside: avoid;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    page-break-before: avoid !important;
   }
 
   .print-grid {
     position: relative !important;
     width: 8.5in !important;
     height: 11in !important;
+    display: block !important;
   }
 
   .print-cell {
