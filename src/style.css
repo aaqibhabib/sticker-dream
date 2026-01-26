@@ -209,7 +209,7 @@ textarea {
 /* Record Button */
 .record {
   font-size: 40px;
-  padding: 50px 2px;
+  padding: 50px 20px;
   background: var(--pastel-green);
   color: var(--dark-text);
   border: 8px solid var(--dark-text);
@@ -223,13 +223,10 @@ textarea {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none; /* Disable iOS callout */
-  position: absolute;
-  bottom: max(10px, env(safe-area-inset-bottom));
-  left: max(5%, env(safe-area-inset-left));
-  right: max(5%, env(safe-area-inset-right));
-  width: auto; /* Changed from 90% */
+  width: 100%;
+  max-width: 600px;
   image-rendering: pixelated;
-  margin-bottom: 30px;
+  margin: 20px 0;
   /* Better tap target for iPad */
   min-height: 120px;
 }
@@ -350,7 +347,6 @@ audio {
     font-size: 48px;
     padding: 60px 40px;
     max-width: 600px;
-    width: 80%;
     border: 10px solid var(--dark-text);
     box-shadow: 10px 10px 0 var(--dark-text), 0 0 0 14px var(--pastel-yellow);
   }
@@ -408,121 +404,7 @@ audio {
   }
 }
 
-/* 2-Panel Responsive Layout for Landscape Tablets/Desktops */
-@media (min-width: 1024px) and (orientation: landscape) {
-  body {
-    align-items: center;
-  }
-
-  /* Transform main-app into 2-column grid */
-  .main-app {
-    display: grid;
-    grid-template-columns: 60% 40%;
-    gap: 30px;
-    align-items: start;
-    max-width: 1400px;
-  }
-
-  /* LEFT PANEL - Preview & Output */
-  .image-display {
-    grid-column: 1;
-    grid-row: 1;
-    justify-self: center;
-    margin-top: 0;
-  }
-
-  .template-section {
-    grid-column: 1;
-    grid-row: 2;
-    padding-bottom: 0; /* Remove extra padding for absolute button */
-    max-height: calc(100vh - 150px);
-    overflow-y: auto;
-  }
-
-  /* RIGHT PANEL - Controls & Input */
-  .record {
-    grid-column: 2;
-    grid-row: 1;
-    position: relative; /* Override absolute positioning */
-    bottom: auto;
-    left: auto;
-    right: auto;
-    width: 100%;
-    max-width: none;
-    margin-bottom: 20px;
-  }
-
-  .transcript {
-    grid-column: 2;
-    grid-row: 2;
-    max-width: none;
-    width: 100%;
-    max-height: calc(100vh - 300px);
-    overflow-y: auto;
-  }
-
-  /* Adjust layout when record button is hidden (State 2: image generated) */
-  .main-app:has(.record[style*="display: none"]) {
-    grid-template-columns: 70% 30%;
-  }
-
-  /* Template section internal layout */
-  .template-section {
-    display: grid;
-    grid-template-areas:
-      "mode"
-      "preview"
-      "actions";
-    gap: 20px;
-  }
-
-  .print-mode-selection {
-    grid-area: mode;
-  }
-
-  .fullpage-preview {
-    grid-area: preview;
-  }
-
-  .sticker-preview {
-    grid-area: preview;
-  }
-
-  .template-section > .new-sticker-btn {
-    grid-area: actions;
-    justify-self: center;
-  }
-
-  /* Wider container for 2-panel layout */
-  .container {
-    max-width: 1400px;
-  }
-
-  .template-grid,
-  .fullpage-container {
-    max-width: 500px;
-  }
-
-  .template-cell {
-    min-width: 80px;
-    min-height: 80px;
-  }
-}
-
-/* Extra Wide Desktop Layout */
-@media (min-width: 1366px) and (orientation: landscape) {
-  .main-app {
-    grid-template-columns: 65% 35%;
-    gap: 40px;
-  }
-
-  .template-grid,
-  .fullpage-container {
-    max-width: 550px;
-  }
-}
-
-/* Extra Large iPad Pro Support */
+/* Landscape mode - just ensure things fit nicely */
 @media (min-width: 1024px) {
   .template-grid {
     gap: 15px;
@@ -545,8 +427,9 @@ audio {
   }
 
   .record {
-    font-size: 32px;
-    padding: 40px 20px;
+    font-size: 28px;
+    padding: 35px 15px;
+    min-height: 100px;
   }
 }
 
@@ -679,50 +562,21 @@ audio {
   transition: all 0.05s ease;
 }
 
-/* Refresh Button */
-.refresh-btn {
+/* Build Info */
+.build-info {
   position: fixed;
   bottom: max(20px, calc(env(safe-area-inset-bottom) + 10px));
   left: max(20px, calc(env(safe-area-inset-left) + 10px));
-  font-size: 18px;
-  padding: 10px 15px;
-  background: var(--pastel-blue);
+  font-size: 12px;
   color: var(--dark-text);
-  border: 3px solid var(--dark-text);
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  box-shadow: 3px 3px 0 var(--dark-text);
-  transition: all 0.15s ease;
-  opacity: 0.7;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  min-width: 44px;
-  min-height: 44px;
+  opacity: 0.5;
+  margin: 0;
   z-index: 100;
 }
 
-.refresh-btn:hover {
-  opacity: 1;
-  transform: rotate(-30deg);
-}
-
-.refresh-btn:active {
-  transform: translate(2px, 2px) rotate(-30deg);
-  box-shadow: 1px 1px 0 var(--dark-text);
-}
-
 @media print {
-  .refresh-btn {
+  .build-info {
     display: none !important;
-  }
-}
-
-/* iPad landscape - move to top-left */
-@media (min-width: 1024px) and (orientation: landscape) {
-  .refresh-btn {
-    top: 20px;
-    bottom: auto;
   }
 }
 
@@ -1063,7 +917,7 @@ audio {
 
   /* Ensure all UI elements are hidden */
   .settings-btn,
-  .refresh-btn,
+  .build-info,
   .record,
   .transcript,
   .image-display,

@@ -8,5 +8,14 @@ export default defineConfig(({ mode }) => ({
     host: '0.0.0.0', // Listen on all network interfaces
     strictPort: true,
   },
+  define: {
+    '__BUILD_TIME__': JSON.stringify(new Date().toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })),
+  },
 }));
 
