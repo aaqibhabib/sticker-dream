@@ -87,9 +87,12 @@ const saveApiKeyBtn = document.getElementById("saveApiKey") as HTMLButtonElement
 const settingsBtn = document.getElementById("settingsBtn") as HTMLButtonElement;
 const buildInfo = document.getElementById("buildInfo") as HTMLParagraphElement;
 const recordBtn = document.querySelector(".record") as HTMLButtonElement;
-const transcriptDiv = document.querySelector(".transcript") as HTMLDivElement;
+const transcriptDiv = document.getElementById("transcript") as HTMLParagraphElement;
 const audioElement = document.querySelector("#audio") as HTMLAudioElement;
 const imageDisplay = document.getElementById("generatedImage") as HTMLImageElement;
+const textInput = document.getElementById("textInput") as HTMLInputElement;
+const generateBtn = document.getElementById("generateBtn") as HTMLButtonElement;
+const inputSection = document.getElementById("inputSection") as HTMLDivElement;
 
 // Template elements
 const templateSection = document.getElementById("templateSection") as HTMLDivElement;
@@ -538,7 +541,8 @@ function checkApiKeyAndShowUI(): void {
     initializeAI(apiKey);
     apiKeySetup.style.display = "none";
     mainApp.style.display = "flex";
-    checkMicrophoneAccess();
+    // Show record button - mic permission requested on first use
+    recordBtn.style.display = "block";
   } else {
     apiKeySetup.style.display = "block";
     mainApp.style.display = "none";
@@ -579,23 +583,22 @@ if (buildInfo) {
   buildInfo.textContent = `Built: ${__BUILD_TIME__}`;
 }
 
-// Check for microphone access and pre-initialize recorder for instant start
-async function checkMicrophoneAccess() {
+// Request microphone access and initialize recorder (called on first voice use)
+async function initializeMicrophone(): Promise<boolean> {
+  if (audioStream && isRecorderReady) {
+    return true; // Already initialized
+  }
+
   try {
-    // Get and KEEP the stream for instant recording
+    transcriptDiv.textContent = "Requesting microphone access...";
     audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-    // Pre-initialize the recorder so it's ready to go
     await setupRecorder();
-
-    // Show the record button
-    recordBtn.style.display = "block";
-    transcriptDiv.textContent = "Press the button and imagine a sticker!";
+    return true;
   } catch (error) {
     console.error("Microphone access denied:", error);
     transcriptDiv.textContent =
-      "❌ Microphone access required. Please enable microphone permissions in your browser settings.";
-    recordBtn.style.display = "none";
+      "Microphone access denied. Use the text input below instead, or enable microphone in settings.";
+    return false;
   }
 }
 
@@ -661,15 +664,17 @@ checkApiKeyAndShowUI();
 
 // Start recording when button is pressed down
 recordBtn.addEventListener("pointerdown", async () => {
+  // Initialize microphone on first use
   if (!isRecorderReady || !mediaRecorder) {
-    console.error("MediaRecorder not ready");
-    transcriptDiv.textContent = "Microphone not ready. Please wait...";
-    return;
+    const success = await initializeMicrophone();
+    if (!success) {
+      return;
+    }
   }
 
   // Clear previous chunks and start immediately
   audioChunks = [];
-  mediaRecorder.start();
+  mediaRecorder!.start();
   recordBtn.classList.add("recording");
   recordBtn.textContent = "Listening...";
 
@@ -709,6 +714,43 @@ recordBtn.addEventListener("pointerleave", () => {
 // Prevent context menu on long press
 recordBtn.addEventListener("contextmenu", (e) => {
   e.preventDefault();
+});
+
+// Text input generate button handler
+async function handleTextGenerate() {
+  const text = textInput.value.trim();
+  if (!text) {
+    textInput.focus();
+    return;
+  }
+
+  // Disable inputs while generating
+  generateBtn.disabled = true;
+  textInput.disabled = true;
+  recordBtn.style.display = "none";
+
+  transcriptDiv.textContent = text;
+  recordBtn.classList.add("loading");
+
+  try {
+    await generateImage(text);
+  } finally {
+    generateBtn.disabled = false;
+    textInput.disabled = false;
+    textInput.value = "";
+    recordBtn.style.display = "block";
+    recordBtn.classList.remove("loading");
+  }
+}
+
+generateBtn.addEventListener("click", handleTextGenerate);
+
+// Allow Enter key to generate
+textInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !generateBtn.disabled) {
+    e.preventDefault();
+    handleTextGenerate();
+  }
 });
 
 // Generate image from transcript

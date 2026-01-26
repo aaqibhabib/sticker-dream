@@ -46,9 +46,22 @@
 
       <!-- Main App (hidden until API key is set) -->
       <div class="main-app" id="mainApp" style="display: none">
-        <button class="record" style="display: none">Sticker Dream</button>
-        <audio id="audio"></audio>
-        <p class="transcript">Checking microphone access...</p>
+        <!-- Input Section -->
+        <div class="input-section" id="inputSection">
+          <button class="record" style="display: none">Hold to Speak</button>
+          <audio id="audio"></audio>
+
+          <div class="input-divider">
+            <span>or type / dictate</span>
+          </div>
+
+          <div class="text-input-wrapper">
+            <input type="text" class="text-input" id="textInput" placeholder="Describe your sticker..." />
+            <button class="generate-btn" id="generateBtn">Dream</button>
+          </div>
+        </div>
+
+        <p class="transcript" id="transcript"></p>
         <img class="image-display" id="generatedImage" style="display: none" />
 
         <!-- Template Section (shown after image generation) -->
