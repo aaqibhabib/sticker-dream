@@ -258,93 +258,192 @@ async function createStickerSheetCanvas(
 }
 
 /**
- * Open a dedicated print window - most reliable for iOS Safari
- * The new window isolates print content and ensures proper loading
+ * Print using an iframe - avoids popup blockers on iOS Safari
+ * Falls back to in-page printing if iframe approach fails
  */
-function openPrintWindow(imageBlobUrl: string, title: string): void {
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    alert('Please allow popups to print. Then try again.');
+function printViaIframe(imageBlobUrl: string): void {
+  // Create hidden iframe for printing
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+  document.body.appendChild(iframe);
+
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (!iframeDoc) {
+    console.warn('Could not access iframe document, falling back to overlay print');
+    document.body.removeChild(iframe);
+    printViaOverlay(imageBlobUrl);
     return;
   }
 
-  printWindow.document.write(`
+  iframeDoc.open();
+  iframeDoc.write(`
     <!DOCTYPE html>
     <html>
     <head>
-      <title>${title}</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body {
+        * { margin: 0; padding: 0; }
+        html, body { width: 100%; height: 100%; background: white; }
+        img {
           width: 100%;
-          height: 100%;
-          background: white;
+          height: auto;
+          display: block;
         }
-        body {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          padding: 20px;
-          font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-        }
-        .print-preview {
-          max-width: 100%;
-          max-height: 70vh;
-          border: 1px solid #ccc;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .print-btn {
-          margin-top: 20px;
-          padding: 15px 40px;
-          font-size: 18px;
-          background: #4CAF50;
-          color: white;
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
-        }
-        .print-btn:active {
-          background: #388E3C;
-        }
-        .close-btn {
-          margin-top: 10px;
-          padding: 10px 30px;
-          font-size: 16px;
-          background: #f5f5f5;
-          color: #333;
-          border: 1px solid #ccc;
-          border-radius: 8px;
-          cursor: pointer;
-        }
-        @media print {
-          body { padding: 0; }
-          .print-btn, .close-btn, .instructions { display: none !important; }
-          .print-preview {
-            max-width: none;
-            max-height: none;
-            width: 100%;
-            height: auto;
-            border: none;
-            box-shadow: none;
-          }
-        }
-        @page {
-          margin: 0;
-          size: letter portrait;
-        }
+        @page { margin: 0; size: letter portrait; }
       </style>
     </head>
     <body>
-      <p class="instructions">Preview your print below. Tap Print when ready.</p>
-      <img class="print-preview" src="${imageBlobUrl}" alt="Print preview" />
-      <button class="print-btn" onclick="window.print()">Print</button>
-      <button class="close-btn" onclick="window.close()">Cancel</button>
+      <img src="${imageBlobUrl}" />
     </body>
     </html>
   `);
-  printWindow.document.close();
+  iframeDoc.close();
+
+  // Wait for image to load in iframe, then print
+  const iframeImg = iframeDoc.querySelector('img') as HTMLImageElement;
+
+  const doPrint = () => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } catch (e) {
+      console.warn('Iframe print failed, falling back to overlay:', e);
+      printViaOverlay(imageBlobUrl);
+    }
+    // Clean up iframe after a delay
+    setTimeout(() => {
+      if (iframe.parentNode) {
+        document.body.removeChild(iframe);
+      }
+    }, 1000);
+  };
+
+  if (iframeImg.complete) {
+    setTimeout(doPrint, 100);
+  } else {
+    iframeImg.onload = () => setTimeout(doPrint, 100);
+    iframeImg.onerror = () => {
+      document.body.removeChild(iframe);
+      printViaOverlay(imageBlobUrl);
+    };
+  }
+}
+
+/**
+ * Fallback: Print via fullscreen overlay
+ * Shows image in overlay, uses main window print with CSS hiding other content
+ */
+function printViaOverlay(imageBlobUrl: string): void {
+  // Create overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'print-overlay';
+  overlay.innerHTML = `
+    <div class="print-overlay-content">
+      <img src="${imageBlobUrl}" class="print-overlay-image" />
+      <div class="print-overlay-buttons">
+        <button class="print-overlay-btn print-now">Print Now</button>
+        <button class="print-overlay-btn cancel">Cancel</button>
+      </div>
+    </div>
+  `;
+
+  // Add styles for overlay (will be added to head)
+  const style = document.createElement('style');
+  style.id = 'print-overlay-styles';
+  style.textContent = `
+    #print-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.9);
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .print-overlay-content {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 90vw;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .print-overlay-image {
+      max-width: 100%;
+      max-height: 60vh;
+      object-fit: contain;
+    }
+    .print-overlay-buttons {
+      margin-top: 20px;
+      display: flex;
+      gap: 15px;
+    }
+    .print-overlay-btn {
+      padding: 15px 30px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .print-overlay-btn.print-now {
+      background: #4CAF50;
+      color: white;
+    }
+    .print-overlay-btn.cancel {
+      background: #e0e0e0;
+      color: #333;
+    }
+
+    @media print {
+      body > *:not(#print-overlay) { display: none !important; }
+      #print-overlay {
+        position: static;
+        background: white;
+        padding: 0;
+      }
+      .print-overlay-content {
+        padding: 0;
+        max-width: none;
+        max-height: none;
+      }
+      .print-overlay-image {
+        max-width: 100%;
+        max-height: none;
+        width: 100%;
+      }
+      .print-overlay-buttons { display: none !important; }
+    }
+    @page { margin: 0; size: letter portrait; }
+  `;
+
+  document.head.appendChild(style);
+  document.body.appendChild(overlay);
+
+  // Handle print button
+  overlay.querySelector('.print-now')?.addEventListener('click', () => {
+    window.print();
+  });
+
+  // Handle cancel
+  overlay.querySelector('.cancel')?.addEventListener('click', () => {
+    cleanup();
+  });
+
+  // Cleanup function
+  const cleanup = () => {
+    overlay.remove();
+    style.remove();
+  };
+
+  // Clean up after print (using afterprint event)
+  const afterPrint = () => {
+    cleanup();
+    window.removeEventListener('afterprint', afterPrint);
+  };
+  window.addEventListener('afterprint', afterPrint);
 }
 
 /**
@@ -356,9 +455,9 @@ async function printFullPageReliable(imageUrl: string): Promise<void> {
   try {
     // Render to canvas at letter size (8.5 x 11 inches at 150 DPI)
     const blobUrl = await imageToCanvasBlob(imageUrl, 1275, 1650, 'contain');
-    console.log('✅ Canvas rendered, opening print window...');
+    console.log('✅ Canvas rendered, printing via iframe...');
 
-    openPrintWindow(blobUrl, 'Sticker Dream - Full Page');
+    printViaIframe(blobUrl);
   } catch (error) {
     console.error('Print preparation failed:', error);
     alert('Failed to prepare print. Please try again.');
@@ -381,9 +480,9 @@ async function printStickerSheetReliable(
 
   try {
     const blobUrl = await createStickerSheetCanvas(imageUrl, filledCells);
-    console.log('✅ Sticker sheet rendered, opening print window...');
+    console.log('✅ Sticker sheet rendered, printing via iframe...');
 
-    openPrintWindow(blobUrl, 'Sticker Dream - Sticker Sheet');
+    printViaIframe(blobUrl);
   } catch (error) {
     console.error('Print preparation failed:', error);
     alert('Failed to prepare print. Please try again.');
