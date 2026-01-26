@@ -91,7 +91,3 @@ While any printer works, thermal printers are great for quick, ink-free prints:
 - **Firefox** - Full support
 
 Note: Microphone access requires HTTPS (localhost works for development).
-
-## Author
-
-**Wes Bos** | MIT License
