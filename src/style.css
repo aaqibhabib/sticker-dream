@@ -181,6 +181,11 @@ body {
   overflow-y: auto;
   user-select: none;
   -webkit-user-select: none;
+  /* iOS specific improvements */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: pan-y;
 }
 
 .container {
@@ -214,15 +219,18 @@ textarea {
   text-transform: uppercase;
   box-shadow: 8px 8px 0 var(--dark-text), 0 0 0 12px var(--pastel-yellow);
   transition: all 0.1s ease;
-  touch-action: manipulation;
+  touch-action: none; /* Prevent scrolling while holding button */
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none; /* Disable iOS callout */
   position: relative;
   image-rendering: pixelated;
   margin-bottom: 30px;
   position: absolute;
   bottom: 10px;
   width: 90%;
+  /* Better tap target for iPad */
+  min-height: 120px;
 }
 
 .record:active {
@@ -232,13 +240,42 @@ textarea {
 
 .record.recording {
   background: var(--pastel-pink);
-  animation: pulse 0.5s ease-in-out infinite alternate;
+  animation: pulse 0.5s ease-in-out infinite alternate, glow 1.5s ease-in-out infinite;
 }
 
 .record.loading {
   background: var(--pastel-blue);
   animation: loading-pulse 1s ease-in-out infinite;
   pointer-events: none;
+}
+
+.record.recording::before {
+  content: "🎤";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 24px;
+  animation: mic-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes mic-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 8px 8px 0 var(--dark-text), 0 0 0 12px var(--pastel-yellow), 0 0 20px rgba(255, 179, 217, 0.3);
+  }
+  50% {
+    box-shadow: 8px 8px 0 var(--dark-text), 0 0 0 12px var(--pastel-yellow), 0 0 40px rgba(255, 179, 217, 0.6);
+  }
 }
 
 /* Animations */
@@ -302,6 +339,140 @@ audio {
   margin-bottom: 10px;
 }
 
+/* iPad and Tablet Optimizations */
+@media (min-width: 768px) and (max-width: 1366px) {
+  .container {
+    max-width: 800px;
+  }
+
+  .record {
+    font-size: 48px;
+    padding: 60px 40px;
+    max-width: 600px;
+    width: 80%;
+    border: 10px solid var(--dark-text);
+    box-shadow: 10px 10px 0 var(--dark-text), 0 0 0 14px var(--pastel-yellow);
+  }
+
+  .record:active {
+    transform: translate(5px, 5px);
+    box-shadow: 5px 5px 0 var(--dark-text), 0 0 0 14px var(--pastel-yellow);
+  }
+
+  .transcript {
+    max-width: 700px;
+    font-size: 32px;
+    padding: 40px;
+  }
+
+  .template-grid {
+    max-width: 450px;
+  }
+
+  .fullpage-container {
+    max-width: 450px;
+  }
+
+  .print-mode-btn {
+    min-width: 160px;
+    padding: 20px 35px;
+  }
+
+  .print-mode-btn .mode-icon {
+    font-size: 36px;
+  }
+
+  .print-mode-btn .mode-label {
+    font-size: 20px;
+  }
+
+  .print-mode-btn .mode-desc {
+    font-size: 14px;
+  }
+
+  .print-btn {
+    font-size: 36px;
+    padding: 35px 60px;
+  }
+
+  .new-sticker-btn {
+    font-size: 22px;
+    padding: 18px 35px;
+  }
+
+  .fill-all-btn,
+  .clear-all-btn {
+    font-size: 18px;
+    padding: 12px 25px;
+  }
+}
+
+/* iPad Landscape Optimizations */
+@media (min-width: 1024px) and (max-width: 1366px) and (orientation: landscape) {
+  body {
+    align-items: center;
+  }
+
+  .container {
+    max-width: 900px;
+  }
+
+  .template-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "mode mode"
+      "preview preview"
+      "actions actions";
+    gap: 20px;
+    align-items: start;
+  }
+
+  .print-mode-selection {
+    grid-area: mode;
+  }
+
+  .fullpage-preview {
+    grid-area: preview;
+  }
+
+  .sticker-preview {
+    grid-area: preview;
+  }
+
+  .template-section > .new-sticker-btn {
+    grid-area: actions;
+    justify-self: center;
+  }
+
+  .record {
+    position: relative;
+    bottom: auto;
+    max-width: 500px;
+  }
+
+  .template-grid,
+  .fullpage-container {
+    max-width: 500px;
+  }
+
+  .template-cell {
+    min-width: 80px;
+    min-height: 80px;
+  }
+}
+
+/* Extra Large iPad Pro Support */
+@media (min-width: 1024px) {
+  .template-grid {
+    gap: 15px;
+  }
+
+  .image-display {
+    max-width: 200px;
+  }
+}
+
 /* Mobile Optimizations */
 @media (max-width: 768px) {
   body {
@@ -311,6 +482,11 @@ audio {
   .transcript {
     padding: 20px;
     font-size: clamp(16px, 3.5vw, 24px);
+  }
+
+  .record {
+    font-size: 32px;
+    padding: 40px 20px;
   }
 }
 
@@ -362,6 +538,17 @@ audio {
   border-radius: 10px;
   margin-bottom: 15px;
   box-sizing: border-box;
+  /* iPad input improvements */
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 60px;
+}
+
+.api-key-setup input:focus {
+  outline: none;
+  border-color: var(--pastel-pink);
+  box-shadow: 0 0 0 2px var(--pastel-pink);
 }
 
 .api-key-setup button {
@@ -375,12 +562,17 @@ audio {
   font-weight: 700;
   text-transform: uppercase;
   box-shadow: 4px 4px 0 var(--dark-text);
-  transition: all 0.1s ease;
+  transition: all 0.15s ease;
+  /* iPad touch improvements */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  min-height: 70px;
 }
 
 .api-key-setup button:active {
   transform: translate(2px, 2px);
   box-shadow: 2px 2px 0 var(--dark-text);
+  transition: all 0.05s ease;
 }
 
 /* Main App Container */
@@ -405,8 +597,14 @@ audio {
   cursor: pointer;
   font-weight: 600;
   box-shadow: 3px 3px 0 var(--dark-text);
-  transition: all 0.1s ease;
+  transition: all 0.15s ease;
   opacity: 0.7;
+  /* iPad touch improvements */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  min-width: 44px;
+  min-height: 44px;
+  z-index: 100;
 }
 
 .settings-btn:hover {
@@ -416,6 +614,7 @@ audio {
 .settings-btn:active {
   transform: translate(2px, 2px);
   box-shadow: 1px 1px 0 var(--dark-text);
+  transition: all 0.05s ease;
 }
 
 /* Print Button */
@@ -430,8 +629,12 @@ audio {
   font-weight: 700;
   text-transform: uppercase;
   box-shadow: 6px 6px 0 var(--dark-text);
-  transition: all 0.1s ease;
+  transition: all 0.15s ease;
   margin-top: 20px;
+  /* Better touch for iPad */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  min-height: 90px;
 }
 
 .print-btn:hover {
@@ -442,6 +645,7 @@ audio {
 .print-btn:active {
   transform: translate(3px, 3px);
   box-shadow: 3px 3px 0 var(--dark-text);
+  transition: all 0.05s ease;
 }
 
 /* Template Section */
@@ -488,20 +692,35 @@ audio {
   border-radius: 50%;
   border: 3px dashed #ccc;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  /* Better touch targets for iPad */
+  min-width: 60px;
+  min-height: 60px;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .template-cell:hover {
   border-color: var(--pastel-pink);
   background-color: rgba(255, 179, 217, 0.2);
+  transform: scale(1.05);
+}
+
+.template-cell:active {
+  transform: scale(0.95);
+  transition: all 0.1s ease;
 }
 
 .template-cell.filled {
   border: 3px solid var(--pastel-green);
   box-shadow: 0 0 0 2px var(--dark-text);
+}
+
+.template-cell.filled:hover {
+  box-shadow: 0 0 0 3px var(--dark-text);
 }
 
 /* Template Action Buttons */
@@ -520,7 +739,11 @@ audio {
   cursor: pointer;
   font-weight: 600;
   box-shadow: 3px 3px 0 var(--dark-text);
-  transition: all 0.1s ease;
+  transition: all 0.15s ease;
+  /* iPad touch improvements */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  min-height: 50px;
 }
 
 .fill-all-btn {
@@ -537,6 +760,7 @@ audio {
 .clear-all-btn:active {
   transform: translate(2px, 2px);
   box-shadow: 1px 1px 0 var(--dark-text);
+  transition: all 0.05s ease;
 }
 
 .new-sticker-btn {
@@ -549,17 +773,140 @@ audio {
   cursor: pointer;
   font-weight: 600;
   box-shadow: 4px 4px 0 var(--dark-text);
-  transition: all 0.1s ease;
+  transition: all 0.15s ease;
   margin-top: 10px;
+  /* iPad touch improvements */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  min-height: 60px;
 }
 
 .new-sticker-btn:active {
   transform: translate(2px, 2px);
   box-shadow: 2px 2px 0 var(--dark-text);
+  transition: all 0.05s ease;
 }
 
-/* Print Template - Hidden on screen, shown when printing */
-.print-template {
+/* Print Mode Selection */
+.print-mode-selection {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.print-mode-selection h3 {
+  margin: 0 0 15px 0;
+  color: var(--dark-text);
+}
+
+.print-mode-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.print-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 15px 25px;
+  background: white;
+  border: 3px solid var(--dark-text);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 3px 3px 0 var(--dark-text);
+  min-width: 120px;
+  /* iPad touch improvements */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  min-height: 100px;
+}
+
+.print-mode-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--dark-text);
+}
+
+.print-mode-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--dark-text);
+  transition: all 0.05s ease;
+}
+
+.print-mode-btn.active {
+  background: var(--pastel-green);
+  border-color: var(--dark-text);
+  box-shadow: 2px 2px 0 var(--dark-text);
+  transform: translate(1px, 1px);
+}
+
+.print-mode-btn.active:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--dark-text);
+}
+
+.print-mode-btn .mode-icon {
+  font-size: 28px;
+  margin-bottom: 5px;
+}
+
+.print-mode-btn .mode-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--dark-text);
+}
+
+.print-mode-btn .mode-desc {
+  font-size: 12px;
+  color: var(--dark-text);
+  opacity: 0.7;
+}
+
+/* Full Page Preview */
+.fullpage-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.fullpage-container {
+  background: white;
+  border: 4px solid var(--dark-text);
+  border-radius: 10px;
+  padding: 15px;
+  box-shadow: 4px 4px 0 var(--dark-text);
+  aspect-ratio: 8.5 / 11;
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fullpage-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* Sticker Preview */
+.sticker-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* Print Templates - Hidden on screen, shown when printing */
+.print-template,
+.print-fullpage {
+  display: none;
+}
+
+.print-fullpage-image {
   display: none;
 }
 
@@ -571,15 +918,22 @@ audio {
    --print-v-pitch: vertical center-to-center distance
 */
 @media print {
+  /* Avery 22877 measurements extracted from official template:
+     ArtBox: [44.5, 44.5498, 567.5, 747.5] points (72pt = 1in)
+     - Left margin: 44.5pt = 0.618in
+     - Top margin: (792 - 747.5)pt = 0.618in
+     - Art width: 523pt = 7.26in for 3 columns
+     - Art height: 703pt = 9.76in for 4 rows
+  */
   :root {
-    --print-top-margin: 0.5in;
-    --print-left-margin: 0.35in;
-    --print-h-pitch: 2.6in;
-    --print-v-pitch: 2.5in;
+    --print-top-margin: 0.618in;
+    --print-left-margin: 0.618in;
+    --print-h-pitch: 2.63in;
+    --print-v-pitch: 2.59in;
     --label-size: 2in;
   }
 
-  /* Hide everything except the print template */
+  /* Hide everything except the print elements */
   html, body {
     background: white !important;
     padding: 0 !important;
@@ -593,8 +947,36 @@ audio {
     display: none !important;
   }
 
-  /* Show print template */
-  .print-template {
+  /* Hide both print templates by default */
+  .print-template,
+  .print-fullpage {
+    display: none !important;
+  }
+
+  /* ========== FULL PAGE PRINT MODE ========== */
+  body.print-mode-fullpage .print-fullpage {
+    display: block !important;
+    width: 8.5in;
+    height: 11in;
+    padding: 0;
+    margin: 0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background: white;
+  }
+
+  body.print-mode-fullpage .print-fullpage-image {
+    display: block !important;
+    width: 8.5in;
+    height: 11in;
+    object-fit: contain;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ========== STICKER SHEET PRINT MODE ========== */
+  body.print-mode-sticker .print-template {
     display: block !important;
     width: 8.5in;
     height: 11in;

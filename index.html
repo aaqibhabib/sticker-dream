@@ -18,9 +18,17 @@
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
     />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- iPad Specific -->
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="theme-color" content="#FFB3D9" />
 
     <!-- iOS Icons -->
     <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icon-192.png" />
 
     <script type="module" src="./src/client.ts"></script>
     <link rel="stylesheet" href="./src/style.css" />
@@ -45,31 +53,59 @@
 
         <!-- Template Section (shown after image generation) -->
         <div class="template-section" id="templateSection" style="display: none">
-          <h3>Click cells to add your sticker</h3>
-          <p class="template-hint">Avery 22877 - 2" Round Labels (3×4 = 12 per sheet)</p>
-
-          <div class="template-grid" id="templateGrid">
-            <!-- 12 cells: 4 columns x 3 rows -->
-            <div class="template-cell" data-cell="0"></div>
-            <div class="template-cell" data-cell="1"></div>
-            <div class="template-cell" data-cell="2"></div>
-            <div class="template-cell" data-cell="3"></div>
-            <div class="template-cell" data-cell="4"></div>
-            <div class="template-cell" data-cell="5"></div>
-            <div class="template-cell" data-cell="6"></div>
-            <div class="template-cell" data-cell="7"></div>
-            <div class="template-cell" data-cell="8"></div>
-            <div class="template-cell" data-cell="9"></div>
-            <div class="template-cell" data-cell="10"></div>
-            <div class="template-cell" data-cell="11"></div>
+          <!-- Print Mode Selection -->
+          <div class="print-mode-selection">
+            <h3>Choose Print Mode</h3>
+            <div class="print-mode-buttons">
+              <button class="print-mode-btn active" id="fullPageMode" data-mode="fullpage">
+                <span class="mode-icon">📄</span>
+                <span class="mode-label">Full Page</span>
+                <span class="mode-desc">8.5" × 11"</span>
+              </button>
+              <button class="print-mode-btn" id="stickerMode" data-mode="sticker">
+                <span class="mode-icon">⭕</span>
+                <span class="mode-label">Sticker Sheet</span>
+                <span class="mode-desc">Avery 22877</span>
+              </button>
+            </div>
           </div>
 
-          <div class="template-actions">
-            <button class="fill-all-btn" id="fillAllBtn">Fill All</button>
-            <button class="clear-all-btn" id="clearAllBtn">Clear All</button>
+          <!-- Full Page Preview (default) -->
+          <div class="fullpage-preview" id="fullpagePreview">
+            <div class="fullpage-container">
+              <img class="fullpage-image" id="fullpageImage" />
+            </div>
+            <button class="print-btn" id="printFullPageBtn">Print Full Page</button>
           </div>
 
-          <button class="print-btn" id="printTemplateBtn">Print Sheet</button>
+          <!-- Sticker Template (hidden by default) -->
+          <div class="sticker-preview" id="stickerPreview" style="display: none">
+            <p class="template-hint">Click cells to add your sticker (2" Round Labels, 12 per sheet)</p>
+
+            <div class="template-grid" id="templateGrid">
+              <!-- 12 cells: 3 columns x 4 rows -->
+              <div class="template-cell" data-cell="0"></div>
+              <div class="template-cell" data-cell="1"></div>
+              <div class="template-cell" data-cell="2"></div>
+              <div class="template-cell" data-cell="3"></div>
+              <div class="template-cell" data-cell="4"></div>
+              <div class="template-cell" data-cell="5"></div>
+              <div class="template-cell" data-cell="6"></div>
+              <div class="template-cell" data-cell="7"></div>
+              <div class="template-cell" data-cell="8"></div>
+              <div class="template-cell" data-cell="9"></div>
+              <div class="template-cell" data-cell="10"></div>
+              <div class="template-cell" data-cell="11"></div>
+            </div>
+
+            <div class="template-actions">
+              <button class="fill-all-btn" id="fillAllBtn">Fill All</button>
+              <button class="clear-all-btn" id="clearAllBtn">Clear All</button>
+            </div>
+
+            <button class="print-btn" id="printTemplateBtn">Print Sticker Sheet</button>
+          </div>
+
           <button class="new-sticker-btn" id="newStickerBtn">New Sticker</button>
         </div>
 
@@ -78,7 +114,12 @@
 
     </div>
 
-    <!-- Print Template (hidden, shown only when printing) - OUTSIDE container -->
+    <!-- Full Page Print (hidden, shown only when printing) - OUTSIDE container -->
+    <div class="print-fullpage" id="printFullpage">
+      <img class="print-fullpage-image" id="printFullpageImage" />
+    </div>
+
+    <!-- Sticker Print Template (hidden, shown only when printing) - OUTSIDE container -->
     <div class="print-template" id="printTemplate">
       <div class="print-grid">
         <div class="print-cell" data-cell="0"></div>
