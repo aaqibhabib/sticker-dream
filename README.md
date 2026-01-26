@@ -1,66 +1,97 @@
 # Sticker Dream
 
+**Live App: [aaqibhabib.github.io/sticker-dream](https://aaqibhabib.github.io/sticker-dream/)**
+
+A voice and text-powered AI sticker generator that creates printable coloring pages. Describe what you want, and it generates a black-and-white coloring page sticker ready to print.
+
 ![](./dream.png)
 
-A voice-activated sticker printer. Press and hold the button, describe what you want, and it generates a black and white coloring page sticker that prints to a thermal printer.
+## Features
 
-## How it works
+### Two Ways to Create
 
-1. Hold the button and speak (max 15 seconds)
-2. Whisper transcribes your voice
-3. Google Imagen generates a coloring page based on your description
-4. Image displays in browser and prints to USB thermal printer
+- **Voice Input** - Hold the "Hold to Speak" button and describe your sticker. Uses Whisper AI for transcription.
+- **Text Input** - Type directly or use iOS/Android native keyboard dictation for more accurate results.
 
-## Setup
+### AI-Powered Generation
 
-1. Install dependencies:
+- Uses **Google Gemini Imagen 4.0** to generate coloring page style images
+- Optimized prompts for clean black-and-white line art perfect for coloring
+- Cancel keywords: say "CANCEL", "ABORT", "BLANK", or "START OVER" to cancel generation
+
+### Print Options
+
+- **Full Page Mode** - Prints image on a full 8.5" x 11" letter page
+- **Sticker Sheet Mode** - Avery 22877 compatible (2" round labels, 12 per sheet)
+  - Click individual cells to place stickers
+  - "Fill All" and "Clear All" buttons for quick setup
+
+### iOS Optimized
+
+- Works as a standalone PWA (add to home screen)
+- iOS-reliable printing using canvas pre-rendering
+- Native keyboard dictation support for accurate speech-to-text
+- Touch-optimized UI with large tap targets
+
+### Privacy First
+
+- **100% client-side** - No server required
+- Your API key stays in your browser's localStorage
+- All AI processing happens directly between your browser and Google's API
+
+## Getting Started
+
+### Use the Hosted Version
+
+1. Visit **[aaqibhabib.github.io/sticker-dream](https://aaqibhabib.github.io/sticker-dream/)**
+2. Get a free Google Gemini API key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+3. Enter your API key when prompted
+4. Start creating stickers!
+
+### Run Locally
 
 ```bash
+# Install dependencies
 pnpm install
-```
 
-2. Create `.env` file:
-
-```
-GEMINI_API_KEY=your_api_key_here
-```
-
-3. Connect a USB thermal printer. Currently only supports USB printer in MacOS - I would like to get this running with bluetooth or a receipt printer instead.
-
-## Running
-
-Start the backend server:
-
-```bash
-pnpm server
-```
-
-Start the frontend (in another terminal):
-
-```bash
+# Start development server (port 7767)
 pnpm dev
+
+# Build for production
+pnpm build
 ```
 
-Open `http://localhost:5173`.
+## Tech Stack
 
-To use your phone, you'll need to visit the page on your local network. Since it uses microphone access, this needs to be a secure origin. I use Cloudflare tunnels for this.
+- **Frontend**: TypeScript, Vite, vanilla DOM
+- **AI Image Generation**: Google Gemini API (Imagen 4.0)
+- **Speech-to-Text**: Hugging Face Transformers (Whisper) - runs in browser
+- **Printing**: Native browser print dialog with canvas pre-rendering
 
-## Printers
+## How It Works
 
-TLDR: [The Phomemo](https://amzn.to/4hOmqki) PM2 will work great over bluetooth or USB.
+1. **Input**: Speak or type a description of your sticker
+2. **Transcribe** (voice only): Whisper AI converts speech to text in your browser
+3. **Generate**: Google Gemini creates a coloring page based on your description
+4. **Preview**: See your sticker with print mode options
+5. **Print**: Use your browser's native print dialog to any connected printer
 
-While any printer will work, I'm using a 4x6 thermal printer with 4x6 shipping labels. These printers are fast, cheap and don't require ink.
+## Recommended Printers
 
-Theoretically a bluetooth printer will work as well, but I have not tested. I'd love to get this working with these cheap Niimbot / Bluetooth "Cat printer", though those labels are plastic and not colour-able.
+While any printer works, thermal printers are great for quick, ink-free prints:
 
-## Tips
+- **[Phomemo PM2](https://amzn.to/4hOmqki)** - Works great over Bluetooth or USB
+- Any 4x6 thermal label printer for shipping labels
+- Standard inkjet/laser printers work fine too
 
-The image prints right away, which is magical. Sometimes you can goof up. In this case, simply say "CANCEL", "ABORT" or "START OVER" as part of your recording.
+## Browser Support
 
-## Ideas
+- **iOS Safari** - Full support including PWA mode
+- **Chrome/Edge** - Full support
+- **Firefox** - Full support
 
-It would be great if this was more portable. That app has 2 pieces: Client and Server. The TTS happens on the client. The Gemini API calls and printing happens on the server.
+Note: Microphone access requires HTTPS (localhost works for development).
 
-The server does not do anything computationally expensive - just API calls -, so it could theoretically be run on Raspberry PI or an ESP32, which may require re-writing in C++. The server also sends the data to the printer - so there would need to be drivers or use a lower level protocol use ESC/POS.
+## Author
 
-It could not be run 100% on an iphone browser as WebSerial / Web USB isn't supported on Safari. Perhaps it could as a react native app?
+**Wes Bos** | MIT License
