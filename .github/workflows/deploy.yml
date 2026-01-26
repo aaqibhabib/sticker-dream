@@ -33,7 +33,9 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Build
-        run: pnpm build
+        run: |
+          export BUILD_TIME="$(date -u +'%b %d, %I:%M %p') UTC"
+          pnpm build
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

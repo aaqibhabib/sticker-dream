@@ -267,10 +267,6 @@ function printViaIframe(imageBlobUrl: string): void {
   // Create hidden iframe for printing
   const iframe = document.createElement('iframe');
   iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-
-  // Prevent any navigation events from bubbling
-  iframe.setAttribute('sandbox', 'allow-same-origin allow-scripts');
-
   document.body.appendChild(iframe);
 
   const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
@@ -577,10 +573,10 @@ settingsBtn.addEventListener("click", () => {
   }
 });
 
-// Show build timestamp
-const BUILD_TIME = "__BUILD_TIME__";
+// Show build timestamp (replaced at build time by Vite)
+declare const __BUILD_TIME__: string;
 if (buildInfo) {
-  buildInfo.textContent = `Built: ${BUILD_TIME}`;
+  buildInfo.textContent = `Built: ${__BUILD_TIME__}`;
 }
 
 // Check for microphone access and pre-initialize recorder for instant start
