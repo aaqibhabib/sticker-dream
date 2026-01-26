@@ -947,72 +947,64 @@ audio {
     display: none !important;
   }
 
-  /* Hide both print templates by default */
-  .print-template,
-  .print-fullpage {
-    display: none !important;
-  }
-
   /* ========== FULL PAGE PRINT MODE ========== */
-  body.print-mode-fullpage .print-fullpage {
-    display: block !important;
-    width: 8.5in;
-    height: 11in;
-    padding: 0;
-    margin: 0;
-    position: absolute;
-    top: 0;
-    left: 0;
-    background: white;
+  .print-fullpage {
+    width: 8.5in !important;
+    height: 11in !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    background: white !important;
     page-break-after: avoid;
     page-break-inside: avoid;
   }
 
-  body.print-mode-fullpage .print-fullpage-image {
+  .print-fullpage-image {
     display: block !important;
-    width: 8.5in;
-    height: 11in;
-    object-fit: contain;
-    -webkit-print-color-adjust: exact;
-    color-adjust: exact;
-    print-color-adjust: exact;
+    width: 8.5in !important;
+    height: 11in !important;
+    object-fit: contain !important;
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
     page-break-inside: avoid;
     opacity: 1 !important;
     visibility: visible !important;
   }
 
   /* ========== STICKER SHEET PRINT MODE ========== */
-  body.print-mode-sticker .print-template {
-    display: block !important;
-    width: 8.5in;
-    height: 11in;
-    padding: 0;
-    margin: 0;
-    position: absolute;
-    top: 0;
-    left: 0;
-    background: white;
+  .print-template {
+    width: 8.5in !important;
+    height: 11in !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    background: white !important;
     page-break-after: avoid;
     page-break-inside: avoid;
   }
 
   .print-grid {
-    position: relative;
-    width: 8.5in;
-    height: 11in;
+    position: relative !important;
+    width: 8.5in !important;
+    height: 11in !important;
   }
 
   .print-cell {
-    position: absolute;
-    width: var(--label-size);
-    height: var(--label-size);
-    border-radius: 50%;
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    -webkit-print-color-adjust: exact;
-    color-adjust: exact;
-    print-color-adjust: exact;
+    position: absolute !important;
+    width: var(--label-size) !important;
+    height: var(--label-size) !important;
+    border-radius: 50% !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
     opacity: 1 !important;
     visibility: visible !important;
   }

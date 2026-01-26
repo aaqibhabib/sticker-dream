@@ -408,43 +408,54 @@ stickerModeBtn.addEventListener("click", setStickerMode);
 
 // Print full page
 printFullPageBtn.addEventListener("click", async () => {
-  document.body.classList.remove('print-mode-sticker');
-  document.body.classList.add('print-mode-fullpage');
+  console.log('🖨️ Print full page clicked');
+
+  // Hide sticker template, show fullpage template
+  printTemplate.style.display = 'none';
+  printFullpage.style.display = 'block';
 
   // Ensure image is fully loaded before printing (critical for iOS/Safari)
   if (printFullpageImage.src && !printFullpageImage.complete) {
+    console.log('⏳ Waiting for image to load...');
     await new Promise(resolve => {
       printFullpageImage.onload = resolve;
     });
   }
 
-  // Wait for print styles to apply (critical for iOS/Safari)
-  setTimeout(() => {
-    window.print();
+  console.log('✅ Image loaded, src:', printFullpageImage.src);
 
-    // Clean up after print dialog closes
-    // Use longer delay for iOS which doesn't fire afterprint reliably
-    setTimeout(() => {
-      document.body.classList.remove('print-mode-fullpage');
-    }, 1000);
-  }, 100);
+  // Wait for DOM update
+  await new Promise(resolve => setTimeout(resolve, 200));
+
+  console.log('🖨️ Opening print dialog...');
+  window.print();
+
+  // Clean up after print dialog closes
+  setTimeout(() => {
+    printTemplate.style.display = 'none';
+    printFullpage.style.display = 'none';
+  }, 1000);
 });
 
 // Print sticker template
-printTemplateBtn.addEventListener("click", () => {
-  document.body.classList.remove('print-mode-fullpage');
-  document.body.classList.add('print-mode-sticker');
+printTemplateBtn.addEventListener("click", async () => {
+  console.log('🖨️ Print sticker sheet clicked');
 
-  // Wait for print styles to apply (critical for iOS/Safari)
+  // Hide fullpage template, show sticker template
+  printFullpage.style.display = 'none';
+  printTemplate.style.display = 'block';
+
+  // Wait for DOM update
+  await new Promise(resolve => setTimeout(resolve, 200));
+
+  console.log('🖨️ Opening print dialog...');
+  window.print();
+
+  // Clean up after print dialog closes
   setTimeout(() => {
-    window.print();
-
-    // Clean up after print dialog closes
-    // Use longer delay for iOS which doesn't fire afterprint reliably
-    setTimeout(() => {
-      document.body.classList.remove('print-mode-sticker');
-    }, 1000);
-  }, 100);
+    printTemplate.style.display = 'none';
+    printFullpage.style.display = 'none';
+  }, 1000);
 });
 
 // New sticker - reset and go back to recording
