@@ -169,7 +169,7 @@ body {
   );
   background-attachment: fixed;
   min-height: 100vh;
-  min-height: 100dvh; /* Dynamic viewport height for mobile */
+  height: 100vh; /* Use fixed instead of 100dvh */
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -223,12 +223,13 @@ textarea {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none; /* Disable iOS callout */
-  position: relative;
+  position: absolute;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  left: max(5%, env(safe-area-inset-left));
+  right: max(5%, env(safe-area-inset-right));
+  width: auto; /* Changed from 90% */
   image-rendering: pixelated;
   margin-bottom: 30px;
-  position: absolute;
-  bottom: 10px;
-  width: 90%;
   /* Better tap target for iPad */
   min-height: 120px;
 }
@@ -533,7 +534,7 @@ audio {
 .api-key-setup input {
   width: 100%;
   padding: 15px;
-  font-size: 18px;
+  font-size: 16px; /* Changed from 18px - prevents iOS auto-zoom */
   border: 4px solid var(--dark-text);
   border-radius: 10px;
   margin-bottom: 15px;
@@ -542,6 +543,8 @@ audio {
   -webkit-appearance: none;
   appearance: none;
   -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   min-height: 60px;
 }
 
@@ -586,8 +589,8 @@ audio {
 /* Settings Button */
 .settings-btn {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
+  bottom: max(20px, calc(env(safe-area-inset-bottom) + 10px));
+  right: max(20px, calc(env(safe-area-inset-right) + 10px));
   font-size: 14px;
   padding: 10px 15px;
   background: white;
@@ -615,6 +618,53 @@ audio {
   transform: translate(2px, 2px);
   box-shadow: 1px 1px 0 var(--dark-text);
   transition: all 0.05s ease;
+}
+
+/* Refresh Button */
+.refresh-btn {
+  position: fixed;
+  bottom: max(20px, calc(env(safe-area-inset-bottom) + 10px));
+  left: max(20px, calc(env(safe-area-inset-left) + 10px));
+  font-size: 18px;
+  padding: 10px 15px;
+  background: var(--pastel-blue);
+  color: var(--dark-text);
+  border: 3px solid var(--dark-text);
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  box-shadow: 3px 3px 0 var(--dark-text);
+  transition: all 0.15s ease;
+  opacity: 0.7;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  min-width: 44px;
+  min-height: 44px;
+  z-index: 100;
+}
+
+.refresh-btn:hover {
+  opacity: 1;
+  transform: rotate(-30deg);
+}
+
+.refresh-btn:active {
+  transform: translate(2px, 2px) rotate(-30deg);
+  box-shadow: 1px 1px 0 var(--dark-text);
+}
+
+@media print {
+  .refresh-btn {
+    display: none !important;
+  }
+}
+
+/* iPad landscape - move to top-left */
+@media (min-width: 1024px) and (orientation: landscape) {
+  .refresh-btn {
+    top: 20px;
+    bottom: auto;
+  }
 }
 
 /* Print Button */

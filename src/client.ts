@@ -85,6 +85,7 @@ const mainApp = document.getElementById("mainApp") as HTMLDivElement;
 const apiKeyInput = document.getElementById("apiKeyInput") as HTMLInputElement;
 const saveApiKeyBtn = document.getElementById("saveApiKey") as HTMLButtonElement;
 const settingsBtn = document.getElementById("settingsBtn") as HTMLButtonElement;
+const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
 const recordBtn = document.querySelector(".record") as HTMLButtonElement;
 const transcriptDiv = document.querySelector(".transcript") as HTMLDivElement;
 const audioElement = document.querySelector("#audio") as HTMLAudioElement;
@@ -130,7 +131,6 @@ function checkApiKeyAndShowUI(): void {
     apiKeySetup.style.display = "none";
     mainApp.style.display = "flex";
     checkMicrophoneAccess();
-    resetRecorder();
   } else {
     apiKeySetup.style.display = "block";
     mainApp.style.display = "none";
@@ -165,6 +165,11 @@ settingsBtn.addEventListener("click", () => {
   }
 });
 
+// Refresh button - reload page
+refreshBtn.addEventListener("click", () => {
+  window.location.reload();
+});
+
 // Check for microphone access before showing the button
 async function checkMicrophoneAccess() {
   try {
@@ -183,56 +188,58 @@ async function checkMicrophoneAccess() {
   }
 }
 
-async function resetRecorder() {
-  audioChunks = [];
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  mediaRecorder = new MediaRecorder(stream);
-  mediaRecorder.ondataavailable = (event) => {
-    console.log(`Data available`, event);
-    audioChunks.push(event.data);
-  };
+async function initializeRecorder(): Promise<void> {
+  try {
+    audioChunks = [];
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
 
-  mediaRecorder.onstop = async () => {
-    console.log(`Media recorder stopped`);
-    // Remove recording class
-    recordBtn.classList.remove("recording");
-    recordBtn.classList.add("loading");
-    recordBtn.textContent = "Imagining...";
+    mediaRecorder.ondataavailable = (event) => {
+      audioChunks.push(event.data);
+    };
 
-    // Create audio blob and URL
-    const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
-    const audioUrl = URL.createObjectURL(audioBlob);
-    audioElement.src = audioUrl;
+    mediaRecorder.onstop = async () => {
+      // Clean up stream immediately
+      if (mediaRecorder?.stream) {
+        mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+      }
 
-    // Transcribe
-    transcriptDiv.textContent = "Transcribing...";
-    const output = await transcriber(audioUrl);
-    const text = Array.isArray(output) ? output[0].text : output.text;
-    transcriptDiv.textContent = text;
+      recordBtn.classList.remove("recording");
+      recordBtn.classList.add("loading");
+      recordBtn.textContent = "Imagining...";
 
-    console.log(output);
-    recordBtn.textContent = "Dreaming Up...";
+      const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+      const audioUrl = URL.createObjectURL(audioBlob);
+      audioElement.src = audioUrl;
 
-    const abortWords = ["BLANK", "NO IMAGE", "NO STICKER", "CANCEL", "ABORT", "START OVER"];
-    if (!text || abortWords.some((word) => text.toUpperCase().includes(word))) {
-      transcriptDiv.textContent = "No image generated.";
+      transcriptDiv.textContent = "Transcribing...";
+      const output = await transcriber(audioUrl);
+      const text = Array.isArray(output) ? output[0].text : output.text;
+      transcriptDiv.textContent = text;
+
+      recordBtn.textContent = "Dreaming Up...";
+
+      const abortWords = ["BLANK", "NO IMAGE", "NO STICKER", "CANCEL", "ABORT", "START OVER"];
+      if (!text || abortWords.some((word) => text.toUpperCase().includes(word))) {
+        transcriptDiv.textContent = "No image generated.";
+        recordBtn.classList.remove("loading");
+        recordBtn.textContent = "Cancelled";
+        setTimeout(() => recordBtn.textContent = "Sticker Dream", 1000);
+        mediaRecorder = null;
+        return;
+      }
+
+      await generateImage(text);
       recordBtn.classList.remove("loading");
-      recordBtn.textContent = "Cancelled";
-      setTimeout(() => {
-        recordBtn.textContent = "Sticker Dream";
-      }, 1000);
-      resetRecorder();
-      return;
-    }
-
-    // Generate the image
-    await generateImage(text);
-
-    // Stop loading state
-    recordBtn.classList.remove("loading");
+      recordBtn.textContent = "Sticker Dream";
+      mediaRecorder = null; // Clear recorder reference
+    };
+  } catch (error) {
+    console.error("Failed to initialize recorder:", error);
+    transcriptDiv.textContent = "❌ Microphone access failed.";
+    recordBtn.classList.remove("recording");
     recordBtn.textContent = "Sticker Dream";
-    resetRecorder();
-  };
+  }
 }
 
 // Initialize on load
@@ -240,35 +247,34 @@ checkApiKeyAndShowUI();
 
 // Start recording when button is pressed down
 recordBtn.addEventListener("pointerdown", async () => {
-  // Reset audio chunks
-  audioChunks = [];
-  console.log(`Media recorder`, mediaRecorder);
-  // Start recording
+  await initializeRecorder(); // Create stream when button pressed
+
+  if (!mediaRecorder) {
+    console.error("MediaRecorder not initialized");
+    return;
+  }
+
   mediaRecorder.start();
-  console.log(`Media recorder started`);
   recordBtn.classList.add("recording");
   recordBtn.textContent = "Listening...";
 
-  // Auto-stop after 15 seconds
   recordingTimeout = window.setTimeout(() => {
-    if (mediaRecorder && mediaRecorder.state === "recording") {
+    if (mediaRecorder?.state === "recording") {
       mediaRecorder.stop();
-      mediaRecorder.stream.getTracks().forEach((track) => track.stop());
     }
   }, 15000);
 });
 
 // Stop recording when button is released
 recordBtn.addEventListener("pointerup", () => {
-  console.log(`Media recorder pointerup`);
   if (recordingTimeout) {
     clearTimeout(recordingTimeout);
     recordingTimeout = null;
   }
 
-  if (mediaRecorder && mediaRecorder.state === "recording") {
+  if (mediaRecorder?.state === "recording") {
     mediaRecorder.stop();
-    mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+    // Stream cleanup happens in onstop handler
   }
 });
 
@@ -279,9 +285,9 @@ recordBtn.addEventListener("pointerleave", () => {
     recordingTimeout = null;
   }
 
-  if (mediaRecorder && mediaRecorder.state === "recording") {
+  if (mediaRecorder?.state === "recording") {
     mediaRecorder.stop();
-    mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+    // Stream cleanup happens in onstop handler
   }
 });
 
