@@ -85,7 +85,7 @@ const mainApp = document.getElementById("mainApp") as HTMLDivElement;
 const apiKeyInput = document.getElementById("apiKeyInput") as HTMLInputElement;
 const saveApiKeyBtn = document.getElementById("saveApiKey") as HTMLButtonElement;
 const settingsBtn = document.getElementById("settingsBtn") as HTMLButtonElement;
-const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
+const buildInfo = document.getElementById("buildInfo") as HTMLParagraphElement;
 const recordBtn = document.querySelector(".record") as HTMLButtonElement;
 const transcriptDiv = document.querySelector(".transcript") as HTMLDivElement;
 const audioElement = document.querySelector("#audio") as HTMLAudioElement;
@@ -531,10 +531,11 @@ settingsBtn.addEventListener("click", () => {
   }
 });
 
-// Refresh button - reload page
-refreshBtn.addEventListener("click", () => {
-  window.location.reload();
-});
+// Show build timestamp
+const BUILD_TIME = "__BUILD_TIME__";
+if (buildInfo) {
+  buildInfo.textContent = `Built: ${BUILD_TIME}`;
+}
 
 // Check for microphone access before showing the button
 async function checkMicrophoneAccess() {
