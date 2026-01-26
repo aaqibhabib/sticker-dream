@@ -960,10 +960,12 @@ audio {
     height: 11in;
     padding: 0;
     margin: 0;
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
     background: white;
+    page-break-after: avoid;
+    page-break-inside: avoid;
   }
 
   body.print-mode-fullpage .print-fullpage-image {
@@ -972,7 +974,11 @@ audio {
     height: 11in;
     object-fit: contain;
     -webkit-print-color-adjust: exact;
+    color-adjust: exact;
     print-color-adjust: exact;
+    page-break-inside: avoid;
+    opacity: 1 !important;
+    visibility: visible !important;
   }
 
   /* ========== STICKER SHEET PRINT MODE ========== */
@@ -982,10 +988,12 @@ audio {
     height: 11in;
     padding: 0;
     margin: 0;
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
     background: white;
+    page-break-after: avoid;
+    page-break-inside: avoid;
   }
 
   .print-grid {
@@ -1003,7 +1011,10 @@ audio {
     background-position: center;
     background-repeat: no-repeat;
     -webkit-print-color-adjust: exact;
+    color-adjust: exact;
     print-color-adjust: exact;
+    opacity: 1 !important;
+    visibility: visible !important;
   }
 
   /* Position each cell - Row 1 */

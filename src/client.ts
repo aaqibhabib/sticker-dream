@@ -407,19 +407,44 @@ fullPageModeBtn.addEventListener("click", setFullPageMode);
 stickerModeBtn.addEventListener("click", setStickerMode);
 
 // Print full page
-printFullPageBtn.addEventListener("click", () => {
+printFullPageBtn.addEventListener("click", async () => {
   document.body.classList.remove('print-mode-sticker');
   document.body.classList.add('print-mode-fullpage');
-  window.print();
-  document.body.classList.remove('print-mode-fullpage');
+
+  // Ensure image is fully loaded before printing (critical for iOS/Safari)
+  if (printFullpageImage.src && !printFullpageImage.complete) {
+    await new Promise(resolve => {
+      printFullpageImage.onload = resolve;
+    });
+  }
+
+  // Wait for print styles to apply (critical for iOS/Safari)
+  setTimeout(() => {
+    window.print();
+
+    // Clean up after print dialog closes
+    // Use longer delay for iOS which doesn't fire afterprint reliably
+    setTimeout(() => {
+      document.body.classList.remove('print-mode-fullpage');
+    }, 1000);
+  }, 100);
 });
 
 // Print sticker template
 printTemplateBtn.addEventListener("click", () => {
   document.body.classList.remove('print-mode-fullpage');
   document.body.classList.add('print-mode-sticker');
-  window.print();
-  document.body.classList.remove('print-mode-sticker');
+
+  // Wait for print styles to apply (critical for iOS/Safari)
+  setTimeout(() => {
+    window.print();
+
+    // Clean up after print dialog closes
+    // Use longer delay for iOS which doesn't fire afterprint reliably
+    setTimeout(() => {
+      document.body.classList.remove('print-mode-sticker');
+    }, 1000);
+  }, 100);
 });
 
 // New sticker - reset and go back to recording
