@@ -118,8 +118,10 @@ const printFullpageImage = document.getElementById("printFullpageImage") as HTML
 let currentPrintMode: 'fullpage' | 'sticker' = 'fullpage';
 
 let mediaRecorder: MediaRecorder | null = null;
+let audioStream: MediaStream | null = null;
 let audioChunks: Blob[] = [];
 let recordingTimeout: number | null = null;
+let isRecorderReady = false;
 
 // Current generated image URL
 let currentImageUrl: string | null = null;
@@ -265,6 +267,10 @@ function printViaIframe(imageBlobUrl: string): void {
   // Create hidden iframe for printing
   const iframe = document.createElement('iframe');
   iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+
+  // Prevent any navigation events from bubbling
+  iframe.setAttribute('sandbox', 'allow-same-origin allow-scripts');
+
   document.body.appendChild(iframe);
 
   const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
@@ -301,20 +307,39 @@ function printViaIframe(imageBlobUrl: string): void {
   // Wait for image to load in iframe, then print
   const iframeImg = iframeDoc.querySelector('img') as HTMLImageElement;
 
+  const cleanupIframe = () => {
+    // Use longer delay and check if iframe still exists
+    setTimeout(() => {
+      try {
+        if (iframe && iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe);
+        }
+      } catch (e) {
+        console.warn('Iframe cleanup error:', e);
+      }
+      // Revoke the blob URL after printing is done
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(imageBlobUrl);
+        } catch (e) {
+          // Ignore errors
+        }
+      }, 5000);
+    }, 2000);
+  };
+
   const doPrint = () => {
     try {
       iframe.contentWindow?.focus();
       iframe.contentWindow?.print();
+      cleanupIframe();
     } catch (e) {
       console.warn('Iframe print failed, falling back to overlay:', e);
-      printViaOverlay(imageBlobUrl);
-    }
-    // Clean up iframe after a delay
-    setTimeout(() => {
       if (iframe.parentNode) {
         document.body.removeChild(iframe);
       }
-    }, 1000);
+      printViaOverlay(imageBlobUrl);
+    }
   };
 
   if (iframeImg.complete) {
@@ -322,7 +347,9 @@ function printViaIframe(imageBlobUrl: string): void {
   } else {
     iframeImg.onload = () => setTimeout(doPrint, 100);
     iframeImg.onerror = () => {
-      document.body.removeChild(iframe);
+      if (iframe.parentNode) {
+        document.body.removeChild(iframe);
+      }
       printViaOverlay(imageBlobUrl);
     };
   }
@@ -422,25 +449,44 @@ function printViaOverlay(imageBlobUrl: string): void {
   document.head.appendChild(style);
   document.body.appendChild(overlay);
 
+  // Cleanup function
+  const cleanup = () => {
+    try {
+      overlay.remove();
+      style.remove();
+      // Revoke blob URL after a delay
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(imageBlobUrl);
+        } catch (e) {
+          // Ignore errors
+        }
+      }, 5000);
+    } catch (e) {
+      console.warn('Overlay cleanup error:', e);
+    }
+  };
+
   // Handle print button
-  overlay.querySelector('.print-now')?.addEventListener('click', () => {
+  overlay.querySelector('.print-now')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     window.print();
   });
 
   // Handle cancel
-  overlay.querySelector('.cancel')?.addEventListener('click', () => {
+  overlay.querySelector('.cancel')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     cleanup();
   });
 
-  // Cleanup function
-  const cleanup = () => {
-    overlay.remove();
-    style.remove();
-  };
-
   // Clean up after print (using afterprint event)
   const afterPrint = () => {
-    cleanup();
+    // Delay cleanup to let iOS finish
+    setTimeout(() => {
+      cleanup();
+    }, 500);
     window.removeEventListener('afterprint', afterPrint);
   };
   window.addEventListener('afterprint', afterPrint);
@@ -537,12 +583,14 @@ if (buildInfo) {
   buildInfo.textContent = `Built: ${BUILD_TIME}`;
 }
 
-// Check for microphone access before showing the button
+// Check for microphone access and pre-initialize recorder for instant start
 async function checkMicrophoneAccess() {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    // Stop the stream immediately, we just needed to check permission
-    stream.getTracks().forEach((track) => track.stop());
+    // Get and KEEP the stream for instant recording
+    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    // Pre-initialize the recorder so it's ready to go
+    await setupRecorder();
 
     // Show the record button
     recordBtn.style.display = "block";
@@ -555,22 +603,24 @@ async function checkMicrophoneAccess() {
   }
 }
 
-async function initializeRecorder(): Promise<void> {
+// Setup recorder with existing stream - called once on init and after each recording
+async function setupRecorder(): Promise<void> {
+  if (!audioStream) {
+    console.error("No audio stream available");
+    return;
+  }
+
   try {
     audioChunks = [];
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder = new MediaRecorder(audioStream);
+    isRecorderReady = true;
 
     mediaRecorder.ondataavailable = (event) => {
       audioChunks.push(event.data);
     };
 
     mediaRecorder.onstop = async () => {
-      // Clean up stream immediately
-      if (mediaRecorder?.stream) {
-        mediaRecorder.stream.getTracks().forEach((track) => track.stop());
-      }
-
+      isRecorderReady = false;
       recordBtn.classList.remove("recording");
       recordBtn.classList.add("loading");
       recordBtn.textContent = "Imagining...";
@@ -592,20 +642,21 @@ async function initializeRecorder(): Promise<void> {
         recordBtn.classList.remove("loading");
         recordBtn.textContent = "Cancelled";
         setTimeout(() => recordBtn.textContent = "Sticker Dream", 1000);
-        mediaRecorder = null;
+        // Re-setup recorder for next use
+        await setupRecorder();
         return;
       }
 
       await generateImage(text);
       recordBtn.classList.remove("loading");
       recordBtn.textContent = "Sticker Dream";
-      mediaRecorder = null; // Clear recorder reference
+
+      // Re-setup recorder for next use
+      await setupRecorder();
     };
   } catch (error) {
-    console.error("Failed to initialize recorder:", error);
-    transcriptDiv.textContent = "❌ Microphone access failed.";
-    recordBtn.classList.remove("recording");
-    recordBtn.textContent = "Sticker Dream";
+    console.error("Failed to setup recorder:", error);
+    isRecorderReady = false;
   }
 }
 
@@ -614,13 +665,14 @@ checkApiKeyAndShowUI();
 
 // Start recording when button is pressed down
 recordBtn.addEventListener("pointerdown", async () => {
-  await initializeRecorder(); // Create stream when button pressed
-
-  if (!mediaRecorder) {
-    console.error("MediaRecorder not initialized");
+  if (!isRecorderReady || !mediaRecorder) {
+    console.error("MediaRecorder not ready");
+    transcriptDiv.textContent = "Microphone not ready. Please wait...";
     return;
   }
 
+  // Clear previous chunks and start immediately
+  audioChunks = [];
   mediaRecorder.start();
   recordBtn.classList.add("recording");
   recordBtn.textContent = "Listening...";
@@ -780,7 +832,9 @@ fullPageModeBtn.addEventListener("click", setFullPageMode);
 stickerModeBtn.addEventListener("click", setStickerMode);
 
 // Print full page - using iOS-reliable canvas + print window approach
-printFullPageBtn.addEventListener("click", async () => {
+printFullPageBtn.addEventListener("click", async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
   console.log('🖨️ Print full page clicked');
 
   if (!currentImageUrl) {
@@ -792,7 +846,9 @@ printFullPageBtn.addEventListener("click", async () => {
 });
 
 // Print sticker template - using iOS-reliable canvas + print window approach
-printTemplateBtn.addEventListener("click", async () => {
+printTemplateBtn.addEventListener("click", async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
   console.log('🖨️ Print sticker sheet clicked');
 
   if (!currentImageUrl) {
