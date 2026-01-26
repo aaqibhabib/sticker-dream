@@ -36,11 +36,15 @@ async function generateImageWithGemini(prompt: string): Promise<string | null> {
 
   const response = await ai.models.generateImages({
     model: imageGen4,
-    prompt: `A black and white kids coloring page.
+    prompt: `A simple black and white kids coloring page sticker design.
+    Style: very simple, bold thick outlines, minimal details, large shapes, easy to color.
+    Perfect for small 2 inch round stickers.
     <image-description>
     ${prompt}
     </image-description>
-    ${prompt}`,
+    ${prompt}
+
+    Keep it simple with thick bold lines and large clear shapes. Minimal fine details.`,
     config: {
       numberOfImages: 1,
       aspectRatio: "1:1", // Square for round labels
@@ -95,9 +99,21 @@ const clearAllBtn = document.getElementById("clearAllBtn") as HTMLButtonElement;
 const printTemplateBtn = document.getElementById("printTemplateBtn") as HTMLButtonElement;
 const newStickerBtn = document.getElementById("newStickerBtn") as HTMLButtonElement;
 
+// Print mode elements
+const fullPageModeBtn = document.getElementById("fullPageMode") as HTMLButtonElement;
+const stickerModeBtn = document.getElementById("stickerMode") as HTMLButtonElement;
+const fullpagePreview = document.getElementById("fullpagePreview") as HTMLDivElement;
+const stickerPreview = document.getElementById("stickerPreview") as HTMLDivElement;
+const fullpageImage = document.getElementById("fullpageImage") as HTMLImageElement;
+const printFullPageBtn = document.getElementById("printFullPageBtn") as HTMLButtonElement;
+
 // Print template elements
 const printTemplate = document.getElementById("printTemplate") as HTMLDivElement;
 const printCells = printTemplate.querySelectorAll(".print-cell") as NodeListOf<HTMLDivElement>;
+const printFullpageImage = document.getElementById("printFullpageImage") as HTMLImageElement;
+
+// Current print mode: 'fullpage' or 'sticker'
+let currentPrintMode: 'fullpage' | 'sticker' = 'fullpage';
 
 let mediaRecorder: MediaRecorder | null = null;
 let audioChunks: Blob[] = [];
@@ -297,8 +313,13 @@ async function generateImage(prompt: string) {
     imageDisplay.src = imageUrl;
     imageDisplay.style.display = "block";
 
-    // Show template section
+    // Set up full page images
+    fullpageImage.src = imageUrl;
+    printFullpageImage.src = imageUrl;
+
+    // Show template section with full page mode as default
     templateSection.style.display = "flex";
+    setFullPageMode();
 
     // Hide record button when template is shown
     recordBtn.style.display = "none";
@@ -359,9 +380,46 @@ clearAllBtn.addEventListener("click", () => {
   });
 });
 
-// Print template
-printTemplateBtn.addEventListener("click", () => {
+// Print mode selection handlers
+function setFullPageMode() {
+  currentPrintMode = 'fullpage';
+  fullPageModeBtn.classList.add('active');
+  stickerModeBtn.classList.remove('active');
+  fullpagePreview.style.display = 'flex';
+  stickerPreview.style.display = 'none';
+
+  // Update fullpage preview image
+  if (currentImageUrl) {
+    fullpageImage.src = currentImageUrl;
+    printFullpageImage.src = currentImageUrl;
+  }
+}
+
+function setStickerMode() {
+  currentPrintMode = 'sticker';
+  stickerModeBtn.classList.add('active');
+  fullPageModeBtn.classList.remove('active');
+  fullpagePreview.style.display = 'none';
+  stickerPreview.style.display = 'flex';
+}
+
+fullPageModeBtn.addEventListener("click", setFullPageMode);
+stickerModeBtn.addEventListener("click", setStickerMode);
+
+// Print full page
+printFullPageBtn.addEventListener("click", () => {
+  document.body.classList.remove('print-mode-sticker');
+  document.body.classList.add('print-mode-fullpage');
   window.print();
+  document.body.classList.remove('print-mode-fullpage');
+});
+
+// Print sticker template
+printTemplateBtn.addEventListener("click", () => {
+  document.body.classList.remove('print-mode-fullpage');
+  document.body.classList.add('print-mode-sticker');
+  window.print();
+  document.body.classList.remove('print-mode-sticker');
 });
 
 // New sticker - reset and go back to recording
@@ -372,6 +430,10 @@ newStickerBtn.addEventListener("click", () => {
     cell.classList.remove("filled");
     printCells[index].style.backgroundImage = "";
   });
+
+  // Clear fullpage images
+  fullpageImage.src = "";
+  printFullpageImage.src = "";
 
   // Hide template section
   templateSection.style.display = "none";
@@ -387,4 +449,7 @@ newStickerBtn.addEventListener("click", () => {
 
   // Clear current image
   currentImageUrl = null;
+
+  // Reset to fullpage mode for next time
+  currentPrintMode = 'fullpage';
 });
