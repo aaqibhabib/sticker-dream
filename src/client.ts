@@ -124,6 +124,272 @@ let recordingTimeout: number | null = null;
 // Current generated image URL
 let currentImageUrl: string | null = null;
 
+// ========== iOS-RELIABLE PRINT UTILITIES ==========
+// Uses canvas pre-rendering and dedicated print windows for iOS Safari compatibility
+
+/**
+ * Load an image and return a promise that resolves when fully loaded
+ */
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+/**
+ * Render image to canvas - ensures content is actually rendered
+ * Returns a blob URL which is more reliable than data URLs on iOS
+ */
+async function imageToCanvasBlob(
+  imageUrl: string,
+  width: number,
+  height: number,
+  fit: 'contain' | 'cover' = 'contain'
+): Promise<string> {
+  const img = await loadImage(imageUrl);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d')!;
+
+  // Fill white background
+  ctx.fillStyle = 'white';
+  ctx.fillRect(0, 0, width, height);
+
+  // Calculate dimensions to fit/cover
+  let drawWidth = width;
+  let drawHeight = height;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  const imgRatio = img.width / img.height;
+  const canvasRatio = width / height;
+
+  if (fit === 'contain') {
+    if (imgRatio > canvasRatio) {
+      drawWidth = width;
+      drawHeight = width / imgRatio;
+      offsetY = (height - drawHeight) / 2;
+    } else {
+      drawHeight = height;
+      drawWidth = height * imgRatio;
+      offsetX = (width - drawWidth) / 2;
+    }
+  }
+
+  ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+
+  // Convert to blob URL (more reliable on iOS than data URL)
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(URL.createObjectURL(blob));
+      } else {
+        reject(new Error('Canvas toBlob failed'));
+      }
+    }, 'image/png');
+  });
+}
+
+/**
+ * Create a sticker sheet canvas with images positioned for Avery 22877 labels
+ */
+async function createStickerSheetCanvas(
+  imageUrl: string,
+  filledCells: number[]
+): Promise<string> {
+  // Letter size at 150 DPI for good print quality
+  const DPI = 150;
+  const pageWidth = 8.5 * DPI;  // 1275px
+  const pageHeight = 11 * DPI;  // 1650px
+
+  // Avery 22877 measurements (in inches, converted to pixels)
+  const topMargin = 0.618 * DPI;
+  const leftMargin = 0.618 * DPI;
+  const hPitch = 2.63 * DPI;  // horizontal spacing
+  const vPitch = 2.59 * DPI;  // vertical spacing
+  const labelSize = 2 * DPI;   // 2" diameter
+
+  const canvas = document.createElement('canvas');
+  canvas.width = pageWidth;
+  canvas.height = pageHeight;
+  const ctx = canvas.getContext('2d')!;
+
+  // White background
+  ctx.fillStyle = 'white';
+  ctx.fillRect(0, 0, pageWidth, pageHeight);
+
+  // Load the sticker image
+  const img = await loadImage(imageUrl);
+
+  // Draw each filled cell
+  for (const cellIndex of filledCells) {
+    const col = cellIndex % 3;
+    const row = Math.floor(cellIndex / 3);
+
+    const x = leftMargin + (col * hPitch);
+    const y = topMargin + (row * vPitch);
+
+    // Clip to circle
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x + labelSize / 2, y + labelSize / 2, labelSize / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+
+    // Draw image to fill the circle
+    ctx.drawImage(img, x, y, labelSize, labelSize);
+    ctx.restore();
+  }
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(URL.createObjectURL(blob));
+      } else {
+        reject(new Error('Canvas toBlob failed'));
+      }
+    }, 'image/png');
+  });
+}
+
+/**
+ * Open a dedicated print window - most reliable for iOS Safari
+ * The new window isolates print content and ensures proper loading
+ */
+function openPrintWindow(imageBlobUrl: string, title: string): void {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert('Please allow popups to print. Then try again.');
+    return;
+  }
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>${title}</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+          width: 100%;
+          height: 100%;
+          background: white;
+        }
+        body {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 20px;
+          font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .print-preview {
+          max-width: 100%;
+          max-height: 70vh;
+          border: 1px solid #ccc;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .print-btn {
+          margin-top: 20px;
+          padding: 15px 40px;
+          font-size: 18px;
+          background: #4CAF50;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .print-btn:active {
+          background: #388E3C;
+        }
+        .close-btn {
+          margin-top: 10px;
+          padding: 10px 30px;
+          font-size: 16px;
+          background: #f5f5f5;
+          color: #333;
+          border: 1px solid #ccc;
+          border-radius: 8px;
+          cursor: pointer;
+        }
+        @media print {
+          body { padding: 0; }
+          .print-btn, .close-btn, .instructions { display: none !important; }
+          .print-preview {
+            max-width: none;
+            max-height: none;
+            width: 100%;
+            height: auto;
+            border: none;
+            box-shadow: none;
+          }
+        }
+        @page {
+          margin: 0;
+          size: letter portrait;
+        }
+      </style>
+    </head>
+    <body>
+      <p class="instructions">Preview your print below. Tap Print when ready.</p>
+      <img class="print-preview" src="${imageBlobUrl}" alt="Print preview" />
+      <button class="print-btn" onclick="window.print()">Print</button>
+      <button class="close-btn" onclick="window.close()">Cancel</button>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
+/**
+ * Main print function for full page mode - iOS reliable
+ */
+async function printFullPageReliable(imageUrl: string): Promise<void> {
+  console.log('🖨️ Preparing full page print (iOS-reliable mode)...');
+
+  try {
+    // Render to canvas at letter size (8.5 x 11 inches at 150 DPI)
+    const blobUrl = await imageToCanvasBlob(imageUrl, 1275, 1650, 'contain');
+    console.log('✅ Canvas rendered, opening print window...');
+
+    openPrintWindow(blobUrl, 'Sticker Dream - Full Page');
+  } catch (error) {
+    console.error('Print preparation failed:', error);
+    alert('Failed to prepare print. Please try again.');
+  }
+}
+
+/**
+ * Main print function for sticker sheet mode - iOS reliable
+ */
+async function printStickerSheetReliable(
+  imageUrl: string,
+  filledCells: number[]
+): Promise<void> {
+  console.log('🖨️ Preparing sticker sheet print (iOS-reliable mode)...');
+
+  if (filledCells.length === 0) {
+    alert('Please fill at least one cell before printing.');
+    return;
+  }
+
+  try {
+    const blobUrl = await createStickerSheetCanvas(imageUrl, filledCells);
+    console.log('✅ Sticker sheet rendered, opening print window...');
+
+    openPrintWindow(blobUrl, 'Sticker Dream - Sticker Sheet');
+  } catch (error) {
+    console.error('Print preparation failed:', error);
+    alert('Failed to prepare print. Please try again.');
+  }
+}
+
 // Check if API key exists and show appropriate UI
 function checkApiKeyAndShowUI(): void {
   const apiKey = getStoredApiKey();
@@ -413,56 +679,36 @@ function setStickerMode() {
 fullPageModeBtn.addEventListener("click", setFullPageMode);
 stickerModeBtn.addEventListener("click", setStickerMode);
 
-// Print full page
+// Print full page - using iOS-reliable canvas + print window approach
 printFullPageBtn.addEventListener("click", async () => {
   console.log('🖨️ Print full page clicked');
 
-  // Hide sticker template, show fullpage template
-  printTemplate.style.display = 'none';
-  printFullpage.style.display = 'block';
-
-  // Ensure image is fully loaded before printing (critical for iOS/Safari)
-  if (printFullpageImage.src && !printFullpageImage.complete) {
-    console.log('⏳ Waiting for image to load...');
-    await new Promise(resolve => {
-      printFullpageImage.onload = resolve;
-    });
+  if (!currentImageUrl) {
+    alert('No image to print');
+    return;
   }
 
-  console.log('✅ Image loaded, src:', printFullpageImage.src);
-
-  // Wait for DOM update
-  await new Promise(resolve => setTimeout(resolve, 200));
-
-  console.log('🖨️ Opening print dialog...');
-  window.print();
-
-  // Clean up after print dialog closes
-  setTimeout(() => {
-    printTemplate.style.display = 'none';
-    printFullpage.style.display = 'none';
-  }, 1000);
+  await printFullPageReliable(currentImageUrl);
 });
 
-// Print sticker template
+// Print sticker template - using iOS-reliable canvas + print window approach
 printTemplateBtn.addEventListener("click", async () => {
   console.log('🖨️ Print sticker sheet clicked');
 
-  // Hide fullpage template, show sticker template
-  printFullpage.style.display = 'none';
-  printTemplate.style.display = 'block';
+  if (!currentImageUrl) {
+    alert('No image to print');
+    return;
+  }
 
-  // Wait for DOM update
-  await new Promise(resolve => setTimeout(resolve, 200));
+  // Get filled cell indices
+  const filledCells: number[] = [];
+  templateCells.forEach((cell, index) => {
+    if (cell.classList.contains('filled')) {
+      filledCells.push(index);
+    }
+  });
 
-  console.log('🖨️ Opening print dialog...');
-  window.print();
-
-  // Clean up after print dialog closes
-  setTimeout(() => {
-    printTemplate.style.display = 'none';
-    printFullpage.style.display = 'none';
-  }, 1000);
+  await printStickerSheetReliable(currentImageUrl, filledCells);
 });
 
 // New sticker - reset and go back to recording
