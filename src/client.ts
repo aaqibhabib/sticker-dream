@@ -1,5 +1,5 @@
 import { pipeline } from "@huggingface/transformers";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, SafetyFilterLevel } from "@google/genai";
 
 // API Key Management
 const API_KEY_STORAGE_KEY = "sticker-dream-gemini-api-key";
@@ -24,7 +24,7 @@ function initializeAI(apiKey: string): void {
 }
 
 // Image generation using Gemini Imagen
-const imageGen4 = "imagen-4.0-generate-001";
+const imageGen4 = "imagen-4.0-fast-generate-001";
 
 async function generateImageWithGemini(prompt: string): Promise<string | null> {
   if (!ai) {
@@ -48,6 +48,7 @@ async function generateImageWithGemini(prompt: string): Promise<string | null> {
     config: {
       numberOfImages: 1,
       aspectRatio: "1:1", // Square for round labels
+      safetyFilterLevel: SafetyFilterLevel.BLOCK_LOW_AND_ABOVE
     },
   });
 
@@ -794,7 +795,7 @@ async function generateImage(prompt: string) {
     transcriptDiv.textContent = `${prompt}\n\nError: Failed to generate image`;
     alert(
       "Failed to generate image: " +
-        (error instanceof Error ? error.message : "Unknown error")
+      (error instanceof Error ? error.message : "Unknown error")
     );
   }
 }
