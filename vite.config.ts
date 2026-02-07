@@ -17,9 +17,6 @@ export default defineConfig(({ mode }) => ({
     host: '0.0.0.0', // Listen on all network interfaces
     strictPort: true,
   },
-  worker: {
-    format: 'es',
-  },
   define: {
     '__BUILD_TIME__': JSON.stringify(buildTime),
   },
