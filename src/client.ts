@@ -1,5 +1,7 @@
 import { pipeline } from "@huggingface/transformers";
 import { GoogleGenAI, SafetyFilterLevel } from "@google/genai";
+import { loadModel, generateImage as localGenerateImage, isModelLoaded, detectCapabilities } from "web-txt2img";
+import type { LoadProgress, GenerationProgressEvent } from "web-txt2img";
 
 // API Key Management
 const API_KEY_STORAGE_KEY = "sticker-dream-gemini-api-key";
@@ -22,6 +24,14 @@ let ai: GoogleGenAI | null = null;
 function initializeAI(apiKey: string): void {
   ai = new GoogleGenAI({ apiKey });
 }
+
+// Generation mode: 'gemini' (cloud) or 'local' (on-device SD-Turbo)
+type GenerationMode = 'gemini' | 'local';
+let currentMode: GenerationMode = 'local';
+let localModelLoaded = false;
+let localModelLoading = false;
+let deviceSupportsLocal = false;
+let detectedBackend: 'webgpu' | 'wasm' | null = null;
 
 // Image generation using Gemini Imagen
 const imageGen4 = "imagen-4.0-fast-generate-001";
@@ -69,6 +79,65 @@ async function generateImageWithGemini(prompt: string): Promise<string | null> {
   return `data:image/png;base64,${imgBytes}`;
 }
 
+// Local model loading
+async function loadLocalModel(onProgress?: (p: LoadProgress) => void): Promise<boolean> {
+  if (localModelLoaded) return true;
+  if (localModelLoading) return false;
+  localModelLoading = true;
+
+  try {
+    const caps = await detectCapabilities();
+    const backendPreference: ('webgpu' | 'wasm')[] = caps.webgpu ? ['webgpu', 'wasm'] : ['wasm'];
+
+    const result = await loadModel('sd-turbo', {
+      backendPreference,
+      onProgress,
+    });
+
+    if (result.ok) {
+      localModelLoaded = true;
+      console.log(`✅ SD-Turbo loaded via ${result.backendUsed}`);
+      return true;
+    } else {
+      console.error('Failed to load SD-Turbo:', result.message);
+      alert(`Failed to load local model: ${result.message}`);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error loading local model:', error);
+    alert('Failed to load local model: ' + (error instanceof Error ? error.message : String(error)));
+    return false;
+  } finally {
+    localModelLoading = false;
+  }
+}
+
+// Image generation using local SD-Turbo
+async function generateImageLocally(prompt: string, onProgress?: (e: GenerationProgressEvent) => void): Promise<string | null> {
+  if (!localModelLoaded) {
+    throw new Error("Local model not loaded");
+  }
+
+  console.log(`🎨 Generating image locally: "${prompt}"`);
+  console.time("local-generation");
+
+  const result = await localGenerateImage({
+    model: 'sd-turbo',
+    prompt: `A simple black and white kids coloring page sticker design, bold thick outlines, minimal details, large shapes, easy to color. ${prompt}`,
+    seed: Math.floor(Math.random() * 2147483647),
+    onProgress,
+  });
+
+  console.timeEnd("local-generation");
+
+  if (!result.ok) {
+    console.error("Local generation failed:", result.message);
+    return null;
+  }
+
+  return URL.createObjectURL(result.blob);
+}
+
 // Initialize the transcriber
 const transcriber = await pipeline(
   "automatic-speech-recognition",
@@ -94,6 +163,32 @@ const imageDisplay = document.getElementById("generatedImage") as HTMLImageEleme
 const textInput = document.getElementById("textInput") as HTMLInputElement;
 const generateBtn = document.getElementById("generateBtn") as HTMLButtonElement;
 const inputSection = document.getElementById("inputSection") as HTMLDivElement;
+
+// Model toggle elements
+const geminiModeBtn = document.getElementById("geminiModeBtn") as HTMLButtonElement;
+const geminiModeDesc = document.getElementById("geminiModeDesc") as HTMLSpanElement;
+const localModeBtn = document.getElementById("localModeBtn") as HTMLButtonElement;
+const localModeDesc = document.getElementById("localModeDesc") as HTMLSpanElement;
+const localModelStatus = document.getElementById("localModelStatus") as HTMLDivElement;
+const timingBadge = document.getElementById("timingBadge") as HTMLDivElement;
+const timingSource = document.getElementById("timingSource") as HTMLSpanElement;
+const timingMs = document.getElementById("timingMs") as HTMLSpanElement;
+const skipApiKey = document.getElementById("skipApiKey") as HTMLParagraphElement;
+const skipApiKeyLink = document.getElementById("skipApiKeyLink") as HTMLAnchorElement;
+
+// Download card elements
+const downloadCard = document.getElementById("downloadCard") as HTMLDivElement;
+const downloadTitle = document.getElementById("downloadTitle") as HTMLSpanElement;
+const downloadNote = document.getElementById("downloadNote") as HTMLSpanElement;
+const downloadSteps = document.getElementById("downloadSteps") as HTMLDivElement;
+const downloadProgress = document.getElementById("downloadProgress") as HTMLDivElement;
+const progressFill = document.getElementById("progressFill") as HTMLDivElement;
+const downloadSize = document.getElementById("downloadSize") as HTMLSpanElement;
+const downloadSpeed = document.getElementById("downloadSpeed") as HTMLSpanElement;
+const downloadStatus = document.getElementById("downloadStatus") as HTMLParagraphElement;
+const stepEncoder = document.getElementById("stepEncoder") as HTMLDivElement;
+const stepUnet = document.getElementById("stepUnet") as HTMLDivElement;
+const stepVae = document.getElementById("stepVae") as HTMLDivElement;
 
 // Template elements
 const templateSection = document.getElementById("templateSection") as HTMLDivElement;
@@ -535,18 +630,114 @@ async function printStickerSheetReliable(
   }
 }
 
-// Check if API key exists and show appropriate UI
-function checkApiKeyAndShowUI(): void {
+// ========== APP INITIALIZATION ==========
+// Detects capabilities, checks API key, and decides what UI to show.
+// Key principle: users should never be blocked if their device supports local mode.
+
+function hasApiKey(): boolean {
+  return !!getStoredApiKey();
+}
+
+// Update Gemini toggle and settings button based on whether an API key is present
+function updateGeminiToggleState(): void {
+  if (hasApiKey()) {
+    geminiModeBtn.disabled = false;
+    geminiModeDesc.textContent = 'Cloud';
+    settingsBtn.textContent = 'Gemini API Key';
+  } else {
+    geminiModeBtn.disabled = true;
+    geminiModeDesc.textContent = 'Needs API Key';
+    settingsBtn.textContent = deviceSupportsLocal ? 'Add Gemini (Optional)' : 'Add API Key';
+  }
+}
+
+// Show the main app (hide API key setup)
+function showMainApp(): void {
+  apiKeySetup.style.display = "none";
+  mainApp.style.display = "flex";
+  recordBtn.style.display = "block";
+}
+
+// Show the API key setup screen (hide main app)
+const apiKeyTitle = document.getElementById("apiKeyTitle") as HTMLHeadingElement;
+const apiKeySubtitle = document.getElementById("apiKeySubtitle") as HTMLParagraphElement;
+
+function showApiKeySetup(): void {
+  apiKeySetup.style.display = "block";
+  mainApp.style.display = "none";
+
+  if (deviceSupportsLocal) {
+    // Local works — framing is optional/additive
+    apiKeyTitle.textContent = 'Add Gemini Cloud (Optional)';
+    apiKeySubtitle.textContent = 'Add a Gemini API key to enable higher-quality cloud generation alongside on-device mode.';
+    skipApiKey.style.display = 'block';
+  } else {
+    // No local — API key is required
+    apiKeyTitle.textContent = 'Setup Required';
+    apiKeySubtitle.textContent = 'Enter your Google Gemini API key to get started.';
+    skipApiKey.style.display = 'none';
+  }
+}
+
+// Device capability detection
+async function checkDeviceCapabilities(): Promise<void> {
+  try {
+    const caps = await detectCapabilities();
+    console.log('Device capabilities:', caps);
+
+    if (caps.webgpu) {
+      deviceSupportsLocal = true;
+      detectedBackend = 'webgpu';
+      localModeBtn.disabled = false;
+      localModeDesc.textContent = 'On-Device (WebGPU)';
+    } else if (caps.wasm) {
+      deviceSupportsLocal = true;
+      detectedBackend = 'wasm';
+      localModeBtn.disabled = false;
+      localModeDesc.textContent = 'On-Device (Slow)';
+    } else {
+      deviceSupportsLocal = false;
+      detectedBackend = null;
+      localModeBtn.disabled = true;
+      localModeDesc.textContent = 'Not Supported';
+      localModeBtn.title = 'Your browser does not support WebGPU or WASM for on-device inference.';
+    }
+  } catch (error) {
+    console.error('Capability detection failed:', error);
+    deviceSupportsLocal = false;
+    localModeBtn.disabled = true;
+    localModeDesc.textContent = 'Unavailable';
+    localModeBtn.title = 'Could not detect device capabilities.';
+  }
+}
+
+// Main initialization — runs once on page load
+// Priority: Local on-device is the primary experience. Gemini is an optional cloud upgrade.
+async function initApp(): Promise<void> {
+  // 1. Detect device capabilities (async — determines if local mode is viable)
+  await checkDeviceCapabilities();
+
+  // 2. Check for stored API key
   const apiKey = getStoredApiKey();
   if (apiKey) {
     initializeAI(apiKey);
-    apiKeySetup.style.display = "none";
-    mainApp.style.display = "flex";
-    // Show record button - mic permission requested on first use
-    recordBtn.style.display = "block";
+  }
+
+  // 3. Update toggle states
+  updateGeminiToggleState();
+
+  // 4. Decide initial UI — always prefer Local when available
+  if (deviceSupportsLocal) {
+    // Device supports local — show app, default to Local (primary experience)
+    showMainApp();
+    setLocalMode();
+  } else if (apiKey) {
+    // No local support but has API key — fall back to Gemini
+    showMainApp();
+    setGeminiMode();
   } else {
-    apiKeySetup.style.display = "block";
-    mainApp.style.display = "none";
+    // No local support AND no API key — must get API key to proceed
+    showApiKeySetup();
   }
 }
 
@@ -560,7 +751,12 @@ saveApiKeyBtn.addEventListener("click", () => {
   setStoredApiKey(apiKey);
   initializeAI(apiKey);
   apiKeyInput.value = "";
-  checkApiKeyAndShowUI();
+  updateGeminiToggleState();
+  showMainApp();
+  // Stay in current mode — adding a key just unlocks Gemini as an option
+  if (!deviceSupportsLocal && currentMode !== 'gemini') {
+    setGeminiMode();
+  }
 });
 
 // Allow Enter key to save
@@ -570,13 +766,251 @@ apiKeyInput.addEventListener("keydown", (e) => {
   }
 });
 
-// Settings button to change API key
+// Skip API key — go straight to local mode
+skipApiKeyLink.addEventListener("click", (e) => {
+  e.preventDefault();
+  showMainApp();
+  setLocalMode();
+});
+
+// Settings button — add or change API key
 settingsBtn.addEventListener("click", () => {
-  if (confirm("Do you want to change your API key?")) {
-    clearStoredApiKey();
-    checkApiKeyAndShowUI();
+  if (hasApiKey()) {
+    if (confirm("Do you want to change your API key?")) {
+      clearStoredApiKey();
+      ai = null;
+      updateGeminiToggleState();
+      // If on Gemini mode, switch to local (if available) or show setup
+      if (currentMode === 'gemini') {
+        if (deviceSupportsLocal) {
+          setLocalMode();
+        } else {
+          showApiKeySetup();
+        }
+      }
+    }
+  } else {
+    // No key yet — show the setup screen to add one
+    showApiKeySetup();
   }
 });
+
+// Model toggle handlers
+function setGeminiMode() {
+  if (!hasApiKey()) return;
+
+  currentMode = 'gemini';
+  geminiModeBtn.classList.add('active');
+  localModeBtn.classList.remove('active');
+  localModelStatus.style.display = 'none';
+}
+
+// Friendly names for model components
+const ASSET_FRIENDLY: Record<string, { label: string; stepEl: HTMLDivElement }> = {
+  'text_encoder/model.onnx': { label: 'Text Encoder', stepEl: stepEncoder },
+  'unet/model.onnx': { label: 'Image Engine', stepEl: stepUnet },
+  'vae_decoder/model.onnx': { label: 'Decoder', stepEl: stepVae },
+};
+
+// Speed tracking for download
+let lastBytesDownloaded = 0;
+let lastSpeedTime = 0;
+let smoothedSpeed = 0; // bytes per second, smoothed
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
+  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
+  if (bytes >= 1e3) return `${(bytes / 1e3).toFixed(0)} KB`;
+  return `${bytes} B`;
+}
+
+function formatSpeed(bytesPerSec: number): string {
+  if (bytesPerSec >= 1e6) return `${(bytesPerSec / 1e6).toFixed(1)} MB/s`;
+  if (bytesPerSec >= 1e3) return `${(bytesPerSec / 1e3).toFixed(0)} KB/s`;
+  return '';
+}
+
+function formatEta(remainingBytes: number, bytesPerSec: number): string {
+  if (bytesPerSec <= 0) return '';
+  const secs = remainingBytes / bytesPerSec;
+  if (secs < 60) return `~${Math.ceil(secs)}s left`;
+  if (secs < 3600) return `~${Math.ceil(secs / 60)}m left`;
+  return `~${(secs / 3600).toFixed(1)}h left`;
+}
+
+// Check if model is already in browser cache
+async function isModelCached(): Promise<boolean> {
+  try {
+    const cache = await caches.open('web-txt2img-v1');
+    // Check for the smallest file (vae_decoder) as a proxy
+    const resp = await cache.match('https://huggingface.co/schmuell/sd-turbo-ort-web/resolve/main/vae_decoder/model.onnx');
+    return !!resp;
+  } catch {
+    return false;
+  }
+}
+
+function setLocalMode() {
+  if (!deviceSupportsLocal) return;
+
+  currentMode = 'local';
+  localModeBtn.classList.add('active');
+  geminiModeBtn.classList.remove('active');
+  localModelStatus.style.display = 'flex';
+
+  if (localModelLoaded) {
+    showModelReady();
+  } else if (!localModelLoading) {
+    // Auto-start loading
+    startModelDownload();
+  }
+}
+
+function showModelReady() {
+  downloadCard.classList.add('ready');
+  downloadCard.classList.remove('downloading');
+  downloadTitle.textContent = 'On-device AI ready';
+  downloadNote.textContent = 'cached locally';
+  downloadSteps.style.display = 'none';
+  downloadProgress.style.display = 'none';
+  downloadStatus.textContent = 'Generate stickers without an internet connection';
+  downloadStatus.classList.add('ready');
+}
+
+async function startModelDownload() {
+  if (localModelLoaded || localModelLoading) return;
+
+  // Check cache first for instant feedback
+  const cached = await isModelCached();
+  if (cached) {
+    downloadTitle.textContent = 'Loading from cache';
+    downloadNote.textContent = 'already downloaded';
+    downloadStatus.textContent = 'Restoring model from browser cache...';
+    downloadCard.classList.add('from-cache');
+  } else {
+    downloadTitle.textContent = 'Downloading AI model';
+    downloadNote.textContent = 'one-time download, ~2.3 GB';
+    downloadStatus.textContent = 'Starting download...';
+  }
+
+  downloadCard.classList.add('downloading');
+  downloadProgress.style.display = 'block';
+  downloadSteps.style.display = 'flex';
+  progressFill.style.width = '0%';
+
+  // Reset speed tracking
+  lastBytesDownloaded = 0;
+  lastSpeedTime = performance.now();
+  smoothedSpeed = 0;
+
+  let currentAsset = '';
+
+  const success = await loadLocalModel((p: LoadProgress) => {
+    const now = performance.now();
+
+    // Update progress bar
+    if (p.pct !== undefined) {
+      progressFill.style.width = `${p.pct}%`;
+    }
+
+    // Update size counter
+    if (p.bytesDownloaded !== undefined && p.totalBytesExpected) {
+      downloadSize.textContent = `${formatBytes(p.bytesDownloaded)} / ${formatBytes(p.totalBytesExpected)}`;
+
+      // Calculate speed (update every 500ms to avoid flicker)
+      const timeDelta = now - lastSpeedTime;
+      if (timeDelta > 500) {
+        const bytesDelta = p.bytesDownloaded - lastBytesDownloaded;
+        const instantSpeed = (bytesDelta / timeDelta) * 1000;
+        // Exponential moving average
+        smoothedSpeed = smoothedSpeed === 0 ? instantSpeed : smoothedSpeed * 0.7 + instantSpeed * 0.3;
+        lastBytesDownloaded = p.bytesDownloaded;
+        lastSpeedTime = now;
+
+        if (smoothedSpeed > 0 && !cached) {
+          const remaining = p.totalBytesExpected - p.bytesDownloaded;
+          downloadSpeed.textContent = `${formatSpeed(smoothedSpeed)} · ${formatEta(remaining, smoothedSpeed)}`;
+        }
+      }
+    }
+
+    // Track asset changes and update step indicators
+    if (p.asset && p.asset !== currentAsset) {
+      // Mark previous asset as complete
+      if (currentAsset) {
+        const prev = ASSET_FRIENDLY[currentAsset];
+        if (prev) {
+          prev.stepEl.classList.remove('active');
+          prev.stepEl.classList.add('complete');
+        }
+      }
+      currentAsset = p.asset;
+
+      // Mark current asset as active
+      const curr = ASSET_FRIENDLY[currentAsset];
+      if (curr) {
+        curr.stepEl.classList.add('active');
+        downloadStatus.textContent = cached
+          ? `Loading ${curr.label}...`
+          : `Downloading ${curr.label}...`;
+      }
+    }
+
+    // Handle "ready" messages (asset completed)
+    if (p.message?.includes('ready in')) {
+      const curr = ASSET_FRIENDLY[currentAsset];
+      if (curr) {
+        curr.stepEl.classList.remove('active');
+        curr.stepEl.classList.add('complete');
+      }
+    }
+  });
+
+  downloadCard.classList.remove('downloading');
+
+  if (success) {
+    // Mark all steps complete
+    [stepEncoder, stepUnet, stepVae].forEach(s => {
+      s.classList.remove('active');
+      s.classList.add('complete');
+    });
+    progressFill.style.width = '100%';
+
+    // Brief celebration before collapsing to ready state
+    downloadStatus.textContent = 'Model loaded successfully!';
+    downloadStatus.classList.add('ready');
+    downloadCard.classList.add('celebrate');
+
+    setTimeout(() => {
+      downloadCard.classList.remove('celebrate', 'from-cache');
+      showModelReady();
+    }, cached ? 800 : 1500);
+  } else {
+    downloadCard.classList.remove('from-cache');
+    downloadStatus.textContent = 'Download failed. Tap to retry.';
+    downloadStatus.classList.add('error');
+    downloadCard.classList.add('error');
+    downloadCard.addEventListener('click', retryDownload, { once: true });
+  }
+}
+
+function retryDownload() {
+  downloadCard.classList.remove('error');
+  downloadStatus.classList.remove('error');
+  [stepEncoder, stepUnet, stepVae].forEach(s => {
+    s.classList.remove('active', 'complete');
+  });
+  startModelDownload();
+}
+
+geminiModeBtn.addEventListener("click", () => {
+  if (!geminiModeBtn.disabled) setGeminiMode();
+});
+localModeBtn.addEventListener("click", () => {
+  if (!localModeBtn.disabled) setLocalMode();
+});
+
+// Load local model - now auto-triggered by setLocalMode()
 
 // Show build timestamp (replaced at build time by Vite)
 declare const __BUILD_TIME__: string;
@@ -661,7 +1095,7 @@ async function setupRecorder(): Promise<void> {
 }
 
 // Initialize on load
-checkApiKeyAndShowUI();
+initApp();
 
 // Start recording when button is pressed down
 recordBtn.addEventListener("pointerdown", async () => {
@@ -754,7 +1188,7 @@ textInput.addEventListener("keydown", (e) => {
   }
 });
 
-// Generate image from transcript
+// Generate image from transcript - routes to correct backend
 async function generateImage(prompt: string) {
   if (!prompt || prompt === "Transcribing...") {
     console.error("No valid prompt to generate");
@@ -762,9 +1196,31 @@ async function generateImage(prompt: string) {
   }
 
   try {
-    transcriptDiv.textContent = `${prompt}\n\nGenerating...`;
+    const startTime = performance.now();
 
-    const imageUrl = await generateImageWithGemini(prompt);
+    if (currentMode === 'local') {
+      if (!localModelLoaded) {
+        alert("Local model is still downloading. Please wait for it to finish.");
+        return;
+      }
+      transcriptDiv.textContent = `${prompt}\n\nGenerating locally...`;
+    } else {
+      transcriptDiv.textContent = `${prompt}\n\nGenerating...`;
+    }
+
+    let imageUrl: string | null;
+
+    if (currentMode === 'local') {
+      imageUrl = await generateImageLocally(prompt, (e: GenerationProgressEvent) => {
+        if (e.phase !== 'complete') {
+          transcriptDiv.textContent = `${prompt}\n\n${e.phase}... ${e.pct ? Math.round(e.pct) + '%' : ''}`;
+        }
+      });
+    } else {
+      imageUrl = await generateImageWithGemini(prompt);
+    }
+
+    const elapsed = performance.now() - startTime;
 
     if (!imageUrl) {
       throw new Error("Failed to generate image");
@@ -788,8 +1244,13 @@ async function generateImage(prompt: string) {
     // Hide record button when template is shown
     recordBtn.style.display = "none";
 
+    // Show timing badge
+    timingBadge.style.display = 'flex';
+    timingSource.textContent = currentMode === 'local' ? 'Local SD-Turbo' : 'Gemini Cloud';
+    timingMs.textContent = `${(elapsed / 1000).toFixed(1)}s`;
+
     transcriptDiv.textContent = prompt;
-    console.log("✅ Image generated!");
+    console.log(`✅ Image generated via ${currentMode} in ${(elapsed / 1000).toFixed(1)}s`);
   } catch (error) {
     console.error("Error:", error);
     transcriptDiv.textContent = `${prompt}\n\nError: Failed to generate image`;
@@ -933,6 +1394,9 @@ newStickerBtn.addEventListener("click", () => {
 
   // Clear current image
   currentImageUrl = null;
+
+  // Hide timing badge
+  timingBadge.style.display = 'none';
 
   // Reset to fullpage mode for next time
   currentPrintMode = 'fullpage';
