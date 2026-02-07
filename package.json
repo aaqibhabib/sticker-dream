@@ -7,7 +7,13 @@
     "build": "vite build",
     "preview": "vite preview"
   },
-  "keywords": ["ai", "sticker", "coloring-page", "voice", "gemini"],
+  "keywords": [
+    "ai",
+    "sticker",
+    "coloring-page",
+    "voice",
+    "gemini"
+  ],
   "author": "Wes Bos (https://wesbos.com)",
   "license": "MIT",
   "type": "module",
@@ -15,6 +21,9 @@
   "dependencies": {
     "@google/genai": "^1.29.0",
     "@huggingface/transformers": "^3.7.6",
-    "vite": "^7.2.2"
+    "@xenova/transformers": "^2.17.2",
+    "onnxruntime-web": "^1.24.1",
+    "vite": "^7.2.2",
+    "web-txt2img": "^0.3.1"
   }
 }

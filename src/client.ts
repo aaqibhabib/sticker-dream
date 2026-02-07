@@ -1,5 +1,7 @@
 import { pipeline } from "@huggingface/transformers";
 import { GoogleGenAI, SafetyFilterLevel } from "@google/genai";
+import { loadModel, generateImage as localGenerateImage, isModelLoaded, detectCapabilities } from "web-txt2img";
+import type { LoadProgress, GenerationProgressEvent } from "web-txt2img";
 
 // API Key Management
 const API_KEY_STORAGE_KEY = "sticker-dream-gemini-api-key";
@@ -22,6 +24,12 @@ let ai: GoogleGenAI | null = null;
 function initializeAI(apiKey: string): void {
   ai = new GoogleGenAI({ apiKey });
 }
+
+// Generation mode: 'gemini' (cloud) or 'local' (on-device SD-Turbo)
+type GenerationMode = 'gemini' | 'local';
+let currentMode: GenerationMode = 'gemini';
+let localModelLoaded = false;
+let localModelLoading = false;
 
 // Image generation using Gemini Imagen
 const imageGen4 = "imagen-4.0-fast-generate-001";
@@ -69,6 +77,65 @@ async function generateImageWithGemini(prompt: string): Promise<string | null> {
   return `data:image/png;base64,${imgBytes}`;
 }
 
+// Local model loading
+async function loadLocalModel(onProgress?: (p: LoadProgress) => void): Promise<boolean> {
+  if (localModelLoaded) return true;
+  if (localModelLoading) return false;
+  localModelLoading = true;
+
+  try {
+    const caps = await detectCapabilities();
+    const backendPreference: ('webgpu' | 'wasm')[] = caps.webgpu ? ['webgpu', 'wasm'] : ['wasm'];
+
+    const result = await loadModel('sd-turbo', {
+      backendPreference,
+      onProgress,
+    });
+
+    if (result.ok) {
+      localModelLoaded = true;
+      console.log(`✅ SD-Turbo loaded via ${result.backendUsed}`);
+      return true;
+    } else {
+      console.error('Failed to load SD-Turbo:', result.message);
+      alert(`Failed to load local model: ${result.message}`);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error loading local model:', error);
+    alert('Failed to load local model: ' + (error instanceof Error ? error.message : String(error)));
+    return false;
+  } finally {
+    localModelLoading = false;
+  }
+}
+
+// Image generation using local SD-Turbo
+async function generateImageLocally(prompt: string, onProgress?: (e: GenerationProgressEvent) => void): Promise<string | null> {
+  if (!localModelLoaded) {
+    throw new Error("Local model not loaded");
+  }
+
+  console.log(`🎨 Generating image locally: "${prompt}"`);
+  console.time("local-generation");
+
+  const result = await localGenerateImage({
+    model: 'sd-turbo',
+    prompt: `A simple black and white kids coloring page sticker design, bold thick outlines, minimal details, large shapes, easy to color. ${prompt}`,
+    seed: Math.floor(Math.random() * 2147483647),
+    onProgress,
+  });
+
+  console.timeEnd("local-generation");
+
+  if (!result.ok) {
+    console.error("Local generation failed:", result.message);
+    return null;
+  }
+
+  return URL.createObjectURL(result.blob);
+}
+
 // Initialize the transcriber
 const transcriber = await pipeline(
   "automatic-speech-recognition",
@@ -94,6 +161,18 @@ const imageDisplay = document.getElementById("generatedImage") as HTMLImageEleme
 const textInput = document.getElementById("textInput") as HTMLInputElement;
 const generateBtn = document.getElementById("generateBtn") as HTMLButtonElement;
 const inputSection = document.getElementById("inputSection") as HTMLDivElement;
+
+// Model toggle elements
+const geminiModeBtn = document.getElementById("geminiModeBtn") as HTMLButtonElement;
+const localModeBtn = document.getElementById("localModeBtn") as HTMLButtonElement;
+const localModelStatus = document.getElementById("localModelStatus") as HTMLDivElement;
+const loadModelBtn = document.getElementById("loadModelBtn") as HTMLButtonElement;
+const modelProgress = document.getElementById("modelProgress") as HTMLDivElement;
+const progressFill = document.getElementById("progressFill") as HTMLDivElement;
+const progressText = document.getElementById("progressText") as HTMLParagraphElement;
+const timingBadge = document.getElementById("timingBadge") as HTMLDivElement;
+const timingSource = document.getElementById("timingSource") as HTMLSpanElement;
+const timingMs = document.getElementById("timingMs") as HTMLSpanElement;
 
 // Template elements
 const templateSection = document.getElementById("templateSection") as HTMLDivElement;
@@ -578,6 +657,63 @@ settingsBtn.addEventListener("click", () => {
   }
 });
 
+// Model toggle handlers
+function setGeminiMode() {
+  currentMode = 'gemini';
+  geminiModeBtn.classList.add('active');
+  localModeBtn.classList.remove('active');
+  localModelStatus.style.display = 'none';
+}
+
+function setLocalMode() {
+  currentMode = 'local';
+  localModeBtn.classList.add('active');
+  geminiModeBtn.classList.remove('active');
+  localModelStatus.style.display = 'flex';
+
+  if (localModelLoaded) {
+    loadModelBtn.style.display = 'none';
+    modelProgress.style.display = 'none';
+  } else if (localModelLoading) {
+    loadModelBtn.style.display = 'none';
+    modelProgress.style.display = 'block';
+  } else {
+    loadModelBtn.style.display = 'block';
+    modelProgress.style.display = 'none';
+  }
+}
+
+geminiModeBtn.addEventListener("click", setGeminiMode);
+localModeBtn.addEventListener("click", setLocalMode);
+
+// Load local model button
+loadModelBtn.addEventListener("click", async () => {
+  loadModelBtn.style.display = 'none';
+  modelProgress.style.display = 'block';
+  progressFill.style.width = '0%';
+  progressText.textContent = 'Preparing...';
+
+  const success = await loadLocalModel((p: LoadProgress) => {
+    if (p.pct !== undefined) {
+      progressFill.style.width = `${p.pct}%`;
+    }
+    if (p.message) {
+      progressText.textContent = p.message;
+    }
+  });
+
+  if (success) {
+    progressFill.style.width = '100%';
+    progressText.textContent = 'Model ready!';
+    setTimeout(() => {
+      modelProgress.style.display = 'none';
+    }, 1500);
+  } else {
+    loadModelBtn.style.display = 'block';
+    modelProgress.style.display = 'none';
+  }
+});
+
 // Show build timestamp (replaced at build time by Vite)
 declare const __BUILD_TIME__: string;
 if (buildInfo) {
@@ -754,7 +890,7 @@ textInput.addEventListener("keydown", (e) => {
   }
 });
 
-// Generate image from transcript
+// Generate image from transcript - routes to correct backend
 async function generateImage(prompt: string) {
   if (!prompt || prompt === "Transcribing...") {
     console.error("No valid prompt to generate");
@@ -762,9 +898,31 @@ async function generateImage(prompt: string) {
   }
 
   try {
-    transcriptDiv.textContent = `${prompt}\n\nGenerating...`;
+    const startTime = performance.now();
 
-    const imageUrl = await generateImageWithGemini(prompt);
+    if (currentMode === 'local') {
+      if (!localModelLoaded) {
+        alert("Local model not loaded yet. Click 'Load Model' first.");
+        return;
+      }
+      transcriptDiv.textContent = `${prompt}\n\nGenerating locally...`;
+    } else {
+      transcriptDiv.textContent = `${prompt}\n\nGenerating...`;
+    }
+
+    let imageUrl: string | null;
+
+    if (currentMode === 'local') {
+      imageUrl = await generateImageLocally(prompt, (e: GenerationProgressEvent) => {
+        if (e.phase !== 'complete') {
+          transcriptDiv.textContent = `${prompt}\n\n${e.phase}... ${e.pct ? Math.round(e.pct) + '%' : ''}`;
+        }
+      });
+    } else {
+      imageUrl = await generateImageWithGemini(prompt);
+    }
+
+    const elapsed = performance.now() - startTime;
 
     if (!imageUrl) {
       throw new Error("Failed to generate image");
@@ -788,8 +946,13 @@ async function generateImage(prompt: string) {
     // Hide record button when template is shown
     recordBtn.style.display = "none";
 
+    // Show timing badge
+    timingBadge.style.display = 'flex';
+    timingSource.textContent = currentMode === 'local' ? 'Local SD-Turbo' : 'Gemini Cloud';
+    timingMs.textContent = `${(elapsed / 1000).toFixed(1)}s`;
+
     transcriptDiv.textContent = prompt;
-    console.log("✅ Image generated!");
+    console.log(`✅ Image generated via ${currentMode} in ${(elapsed / 1000).toFixed(1)}s`);
   } catch (error) {
     console.error("Error:", error);
     transcriptDiv.textContent = `${prompt}\n\nError: Failed to generate image`;
@@ -933,6 +1096,9 @@ newStickerBtn.addEventListener("click", () => {
 
   // Clear current image
   currentImageUrl = null;
+
+  // Hide timing badge
+  timingBadge.style.display = 'none';
 
   // Reset to fullpage mode for next time
   currentPrintMode = 'fullpage';

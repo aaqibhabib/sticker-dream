@@ -46,6 +46,38 @@
 
       <!-- Main App (hidden until API key is set) -->
       <div class="main-app" id="mainApp" style="display: none">
+        <!-- Model Toggle -->
+        <div class="model-toggle" id="modelToggle">
+          <button class="model-toggle-btn active" id="geminiModeBtn" data-mode="gemini">
+            <span class="mode-label">Gemini</span>
+            <span class="mode-desc">Cloud</span>
+          </button>
+          <button class="model-toggle-btn" id="localModeBtn" data-mode="local">
+            <span class="mode-label">Local</span>
+            <span class="mode-desc">On-Device</span>
+          </button>
+        </div>
+
+        <!-- Local Model Status (hidden by default) -->
+        <div class="local-model-status" id="localModelStatus" style="display: none">
+          <div class="model-info-bar" id="modelInfoBar">
+            <span class="model-name">SD-Turbo (512x512)</span>
+            <span class="model-size">~2.4 GB download</span>
+          </div>
+          <button class="load-model-btn" id="loadModelBtn">Load Model</button>
+          <div class="model-progress" id="modelProgress" style="display: none">
+            <div class="progress-bar">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p class="progress-text" id="progressText">Preparing...</p>
+          </div>
+        </div>
+
+        <!-- Generation Timing Badge -->
+        <div class="timing-badge" id="timingBadge" style="display: none">
+          <span id="timingSource"></span> <span id="timingMs"></span>
+        </div>
+
         <!-- Input Section -->
         <div class="input-section" id="inputSection">
           <button class="record" style="display: none">Hold to Speak</button>
