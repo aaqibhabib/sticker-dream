@@ -35,11 +35,11 @@
   </head>
   <body>
     <div class="container">
-      <!-- API Key Setup -->
+      <!-- API Key Setup (shown only when device has no local support) -->
       <div class="api-key-setup" id="apiKeySetup">
-        <h2>Setup Required</h2>
-        <p>Enter your Google Gemini API key to get started.</p>
-        <p class="api-key-hint">Get one free at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a></p>
+        <h2 id="apiKeyTitle">Setup Required</h2>
+        <p id="apiKeySubtitle">Enter your Google Gemini API key to get started.</p>
+        <p class="api-key-hint">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a></p>
         <input type="password" id="apiKeyInput" placeholder="Enter your Gemini API key" />
         <button id="saveApiKey">Save Key</button>
         <p class="skip-api-key" id="skipApiKey" style="display: none">
@@ -49,15 +49,15 @@
 
       <!-- Main App (hidden until API key is set) -->
       <div class="main-app" id="mainApp" style="display: none">
-        <!-- Model Toggle -->
+        <!-- Model Toggle (Local-first: on-device is primary, Gemini is optional cloud upgrade) -->
         <div class="model-toggle" id="modelToggle">
-          <button class="model-toggle-btn active" id="geminiModeBtn" data-mode="gemini">
-            <span class="mode-label">Gemini</span>
-            <span class="mode-desc" id="geminiModeDesc">Cloud</span>
-          </button>
           <button class="model-toggle-btn" id="localModeBtn" data-mode="local" disabled>
             <span class="mode-label">Local</span>
             <span class="mode-desc" id="localModeDesc">Checking...</span>
+          </button>
+          <button class="model-toggle-btn" id="geminiModeBtn" data-mode="gemini" disabled>
+            <span class="mode-label">Gemini</span>
+            <span class="mode-desc" id="geminiModeDesc">Cloud</span>
           </button>
         </div>
 

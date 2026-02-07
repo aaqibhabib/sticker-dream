@@ -27,7 +27,7 @@ function initializeAI(apiKey: string): void {
 
 // Generation mode: 'gemini' (cloud) or 'local' (on-device SD-Turbo)
 type GenerationMode = 'gemini' | 'local';
-let currentMode: GenerationMode = 'gemini';
+let currentMode: GenerationMode = 'local';
 let localModelLoaded = false;
 let localModelLoading = false;
 let deviceSupportsLocal = false;
@@ -634,11 +634,11 @@ function updateGeminiToggleState(): void {
   if (hasApiKey()) {
     geminiModeBtn.disabled = false;
     geminiModeDesc.textContent = 'Cloud';
-    settingsBtn.textContent = 'Change API Key';
+    settingsBtn.textContent = 'Gemini API Key';
   } else {
     geminiModeBtn.disabled = true;
     geminiModeDesc.textContent = 'Needs API Key';
-    settingsBtn.textContent = 'Add API Key';
+    settingsBtn.textContent = deviceSupportsLocal ? 'Add Gemini (Optional)' : 'Add API Key';
   }
 }
 
@@ -650,11 +650,24 @@ function showMainApp(): void {
 }
 
 // Show the API key setup screen (hide main app)
+const apiKeyTitle = document.getElementById("apiKeyTitle") as HTMLHeadingElement;
+const apiKeySubtitle = document.getElementById("apiKeySubtitle") as HTMLParagraphElement;
+
 function showApiKeySetup(): void {
   apiKeySetup.style.display = "block";
   mainApp.style.display = "none";
-  // Show skip link if device supports local
-  skipApiKey.style.display = deviceSupportsLocal ? 'block' : 'none';
+
+  if (deviceSupportsLocal) {
+    // Local works — framing is optional/additive
+    apiKeyTitle.textContent = 'Add Gemini Cloud (Optional)';
+    apiKeySubtitle.textContent = 'Add a Gemini API key to enable higher-quality cloud generation alongside on-device mode.';
+    skipApiKey.style.display = 'block';
+  } else {
+    // No local — API key is required
+    apiKeyTitle.textContent = 'Setup Required';
+    apiKeySubtitle.textContent = 'Enter your Google Gemini API key to get started.';
+    skipApiKey.style.display = 'none';
+  }
 }
 
 // Device capability detection
@@ -692,6 +705,7 @@ async function checkDeviceCapabilities(): Promise<void> {
 }
 
 // Main initialization — runs once on page load
+// Priority: Local on-device is the primary experience. Gemini is an optional cloud upgrade.
 async function initApp(): Promise<void> {
   // 1. Detect device capabilities (async — determines if local mode is viable)
   await checkDeviceCapabilities();
@@ -705,17 +719,17 @@ async function initApp(): Promise<void> {
   // 3. Update toggle states
   updateGeminiToggleState();
 
-  // 4. Decide initial UI
-  if (apiKey) {
-    // Has API key — show app, default to Gemini
-    showMainApp();
-    setGeminiMode();
-  } else if (deviceSupportsLocal) {
-    // No API key but local works — show app, default to Local
+  // 4. Decide initial UI — always prefer Local when available
+  if (deviceSupportsLocal) {
+    // Device supports local — show app, default to Local (primary experience)
     showMainApp();
     setLocalMode();
+  } else if (apiKey) {
+    // No local support but has API key — fall back to Gemini
+    showMainApp();
+    setGeminiMode();
   } else {
-    // No API key AND no local support — must get API key to proceed
+    // No local support AND no API key — must get API key to proceed
     showApiKeySetup();
   }
 }
@@ -732,8 +746,8 @@ saveApiKeyBtn.addEventListener("click", () => {
   apiKeyInput.value = "";
   updateGeminiToggleState();
   showMainApp();
-  // If currently in local mode, stay there. Otherwise default to Gemini.
-  if (currentMode !== 'local') {
+  // Stay in current mode — adding a key just unlocks Gemini as an option
+  if (!deviceSupportsLocal && currentMode !== 'gemini') {
     setGeminiMode();
   }
 });
