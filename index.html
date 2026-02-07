@@ -35,74 +35,17 @@
   </head>
   <body>
     <div class="container">
-      <!-- API Key Setup (shown only when device has no local support) -->
+      <!-- API Key Setup -->
       <div class="api-key-setup" id="apiKeySetup">
-        <h2 id="apiKeyTitle">Setup Required</h2>
-        <p id="apiKeySubtitle">Enter your Google Gemini API key to get started.</p>
-        <p class="api-key-hint">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a></p>
+        <h2>Setup Required</h2>
+        <p>Enter your Google Gemini API key to get started.</p>
+        <p class="api-key-hint">Get one free at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a></p>
         <input type="password" id="apiKeyInput" placeholder="Enter your Gemini API key" />
         <button id="saveApiKey">Save Key</button>
-        <p class="skip-api-key" id="skipApiKey" style="display: none">
-          <a href="#" id="skipApiKeyLink">Skip &mdash; use on-device model instead</a>
-        </p>
       </div>
 
       <!-- Main App (hidden until API key is set) -->
       <div class="main-app" id="mainApp" style="display: none">
-        <!-- Model Toggle (Local-first: on-device is primary, Gemini is optional cloud upgrade) -->
-        <div class="model-toggle" id="modelToggle">
-          <button class="model-toggle-btn" id="localModeBtn" data-mode="local" disabled>
-            <span class="mode-label">Local</span>
-            <span class="mode-desc" id="localModeDesc">Checking...</span>
-          </button>
-          <button class="model-toggle-btn" id="geminiModeBtn" data-mode="gemini" disabled>
-            <span class="mode-label">Gemini</span>
-            <span class="mode-desc" id="geminiModeDesc">Cloud</span>
-          </button>
-        </div>
-
-        <!-- Local Model Status (hidden by default) -->
-        <div class="local-model-status" id="localModelStatus" style="display: none">
-          <div class="download-card" id="downloadCard">
-            <div class="download-header" id="downloadHeader">
-              <span class="download-title" id="downloadTitle">Preparing on-device AI</span>
-              <span class="download-note" id="downloadNote">one-time download</span>
-            </div>
-            <div class="download-steps" id="downloadSteps">
-              <div class="download-step" id="stepEncoder" data-step="text_encoder">
-                <span class="step-dot"></span>
-                <span class="step-label">Text Encoder</span>
-                <span class="step-size">1.7 GB</span>
-              </div>
-              <div class="download-step" id="stepUnet" data-step="unet">
-                <span class="step-dot"></span>
-                <span class="step-label">Image Engine</span>
-                <span class="step-size">640 MB</span>
-              </div>
-              <div class="download-step" id="stepVae" data-step="vae_decoder">
-                <span class="step-dot"></span>
-                <span class="step-label">Decoder</span>
-                <span class="step-size">95 MB</span>
-              </div>
-            </div>
-            <div class="download-progress" id="downloadProgress">
-              <div class="progress-bar">
-                <div class="progress-fill" id="progressFill"></div>
-              </div>
-              <div class="download-stats">
-                <span class="download-size" id="downloadSize">0 MB / 2.3 GB</span>
-                <span class="download-speed" id="downloadSpeed"></span>
-              </div>
-            </div>
-            <p class="download-status" id="downloadStatus">Waiting to start...</p>
-          </div>
-        </div>
-
-        <!-- Generation Timing Badge -->
-        <div class="timing-badge" id="timingBadge" style="display: none">
-          <span id="timingSource"></span> <span id="timingMs"></span>
-        </div>
-
         <!-- Input Section -->
         <div class="input-section" id="inputSection">
           <button class="record" style="display: none">Hold to Speak</button>
