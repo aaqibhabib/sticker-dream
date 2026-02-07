@@ -63,16 +63,38 @@
 
         <!-- Local Model Status (hidden by default) -->
         <div class="local-model-status" id="localModelStatus" style="display: none">
-          <div class="model-info-bar" id="modelInfoBar">
-            <span class="model-name">SD-Turbo (512x512)</span>
-            <span class="model-size">~2.4 GB download</span>
-          </div>
-          <button class="load-model-btn" id="loadModelBtn">Load Model</button>
-          <div class="model-progress" id="modelProgress" style="display: none">
-            <div class="progress-bar">
-              <div class="progress-fill" id="progressFill"></div>
+          <div class="download-card" id="downloadCard">
+            <div class="download-header" id="downloadHeader">
+              <span class="download-title" id="downloadTitle">Preparing on-device AI</span>
+              <span class="download-note" id="downloadNote">one-time download</span>
             </div>
-            <p class="progress-text" id="progressText">Preparing...</p>
+            <div class="download-steps" id="downloadSteps">
+              <div class="download-step" id="stepEncoder" data-step="text_encoder">
+                <span class="step-dot"></span>
+                <span class="step-label">Text Encoder</span>
+                <span class="step-size">1.7 GB</span>
+              </div>
+              <div class="download-step" id="stepUnet" data-step="unet">
+                <span class="step-dot"></span>
+                <span class="step-label">Image Engine</span>
+                <span class="step-size">640 MB</span>
+              </div>
+              <div class="download-step" id="stepVae" data-step="vae_decoder">
+                <span class="step-dot"></span>
+                <span class="step-label">Decoder</span>
+                <span class="step-size">95 MB</span>
+              </div>
+            </div>
+            <div class="download-progress" id="downloadProgress">
+              <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+              </div>
+              <div class="download-stats">
+                <span class="download-size" id="downloadSize">0 MB / 2.3 GB</span>
+                <span class="download-speed" id="downloadSpeed"></span>
+              </div>
+            </div>
+            <p class="download-status" id="downloadStatus">Waiting to start...</p>
           </div>
         </div>
 

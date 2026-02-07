@@ -169,17 +169,26 @@ const geminiModeBtn = document.getElementById("geminiModeBtn") as HTMLButtonElem
 const geminiModeDesc = document.getElementById("geminiModeDesc") as HTMLSpanElement;
 const localModeBtn = document.getElementById("localModeBtn") as HTMLButtonElement;
 const localModeDesc = document.getElementById("localModeDesc") as HTMLSpanElement;
-const modelInfoBar = document.getElementById("modelInfoBar") as HTMLDivElement;
 const localModelStatus = document.getElementById("localModelStatus") as HTMLDivElement;
-const loadModelBtn = document.getElementById("loadModelBtn") as HTMLButtonElement;
-const modelProgress = document.getElementById("modelProgress") as HTMLDivElement;
-const progressFill = document.getElementById("progressFill") as HTMLDivElement;
-const progressText = document.getElementById("progressText") as HTMLParagraphElement;
 const timingBadge = document.getElementById("timingBadge") as HTMLDivElement;
 const timingSource = document.getElementById("timingSource") as HTMLSpanElement;
 const timingMs = document.getElementById("timingMs") as HTMLSpanElement;
 const skipApiKey = document.getElementById("skipApiKey") as HTMLParagraphElement;
 const skipApiKeyLink = document.getElementById("skipApiKeyLink") as HTMLAnchorElement;
+
+// Download card elements
+const downloadCard = document.getElementById("downloadCard") as HTMLDivElement;
+const downloadTitle = document.getElementById("downloadTitle") as HTMLSpanElement;
+const downloadNote = document.getElementById("downloadNote") as HTMLSpanElement;
+const downloadSteps = document.getElementById("downloadSteps") as HTMLDivElement;
+const downloadProgress = document.getElementById("downloadProgress") as HTMLDivElement;
+const progressFill = document.getElementById("progressFill") as HTMLDivElement;
+const downloadSize = document.getElementById("downloadSize") as HTMLSpanElement;
+const downloadSpeed = document.getElementById("downloadSpeed") as HTMLSpanElement;
+const downloadStatus = document.getElementById("downloadStatus") as HTMLParagraphElement;
+const stepEncoder = document.getElementById("stepEncoder") as HTMLDivElement;
+const stepUnet = document.getElementById("stepUnet") as HTMLDivElement;
+const stepVae = document.getElementById("stepVae") as HTMLDivElement;
 
 // Template elements
 const templateSection = document.getElementById("templateSection") as HTMLDivElement;
@@ -681,13 +690,11 @@ async function checkDeviceCapabilities(): Promise<void> {
       detectedBackend = 'webgpu';
       localModeBtn.disabled = false;
       localModeDesc.textContent = 'On-Device (WebGPU)';
-      modelInfoBar.querySelector('.model-name')!.textContent = 'SD-Turbo (512x512) via WebGPU';
     } else if (caps.wasm) {
       deviceSupportsLocal = true;
       detectedBackend = 'wasm';
       localModeBtn.disabled = false;
       localModeDesc.textContent = 'On-Device (Slow)';
-      modelInfoBar.querySelector('.model-name')!.textContent = 'SD-Turbo (512x512) via WASM (slow)';
     } else {
       deviceSupportsLocal = false;
       detectedBackend = null;
@@ -798,6 +805,51 @@ function setGeminiMode() {
   localModelStatus.style.display = 'none';
 }
 
+// Friendly names for model components
+const ASSET_FRIENDLY: Record<string, { label: string; stepEl: HTMLDivElement }> = {
+  'text_encoder/model.onnx': { label: 'Text Encoder', stepEl: stepEncoder },
+  'unet/model.onnx': { label: 'Image Engine', stepEl: stepUnet },
+  'vae_decoder/model.onnx': { label: 'Decoder', stepEl: stepVae },
+};
+
+// Speed tracking for download
+let lastBytesDownloaded = 0;
+let lastSpeedTime = 0;
+let smoothedSpeed = 0; // bytes per second, smoothed
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
+  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
+  if (bytes >= 1e3) return `${(bytes / 1e3).toFixed(0)} KB`;
+  return `${bytes} B`;
+}
+
+function formatSpeed(bytesPerSec: number): string {
+  if (bytesPerSec >= 1e6) return `${(bytesPerSec / 1e6).toFixed(1)} MB/s`;
+  if (bytesPerSec >= 1e3) return `${(bytesPerSec / 1e3).toFixed(0)} KB/s`;
+  return '';
+}
+
+function formatEta(remainingBytes: number, bytesPerSec: number): string {
+  if (bytesPerSec <= 0) return '';
+  const secs = remainingBytes / bytesPerSec;
+  if (secs < 60) return `~${Math.ceil(secs)}s left`;
+  if (secs < 3600) return `~${Math.ceil(secs / 60)}m left`;
+  return `~${(secs / 3600).toFixed(1)}h left`;
+}
+
+// Check if model is already in browser cache
+async function isModelCached(): Promise<boolean> {
+  try {
+    const cache = await caches.open('web-txt2img-v1');
+    // Check for the smallest file (vae_decoder) as a proxy
+    const resp = await cache.match('https://huggingface.co/schmuell/sd-turbo-ort-web/resolve/main/vae_decoder/model.onnx');
+    return !!resp;
+  } catch {
+    return false;
+  }
+}
+
 function setLocalMode() {
   if (!deviceSupportsLocal) return;
 
@@ -807,15 +859,148 @@ function setLocalMode() {
   localModelStatus.style.display = 'flex';
 
   if (localModelLoaded) {
-    loadModelBtn.style.display = 'none';
-    modelProgress.style.display = 'none';
-  } else if (localModelLoading) {
-    loadModelBtn.style.display = 'none';
-    modelProgress.style.display = 'block';
-  } else {
-    loadModelBtn.style.display = 'block';
-    modelProgress.style.display = 'none';
+    showModelReady();
+  } else if (!localModelLoading) {
+    // Auto-start loading
+    startModelDownload();
   }
+}
+
+function showModelReady() {
+  downloadCard.classList.add('ready');
+  downloadCard.classList.remove('downloading');
+  downloadTitle.textContent = 'On-device AI ready';
+  downloadNote.textContent = 'cached locally';
+  downloadSteps.style.display = 'none';
+  downloadProgress.style.display = 'none';
+  downloadStatus.textContent = 'Generate stickers without an internet connection';
+  downloadStatus.classList.add('ready');
+}
+
+async function startModelDownload() {
+  if (localModelLoaded || localModelLoading) return;
+
+  // Check cache first for instant feedback
+  const cached = await isModelCached();
+  if (cached) {
+    downloadTitle.textContent = 'Loading from cache';
+    downloadNote.textContent = 'already downloaded';
+    downloadStatus.textContent = 'Restoring model from browser cache...';
+    downloadCard.classList.add('from-cache');
+  } else {
+    downloadTitle.textContent = 'Downloading AI model';
+    downloadNote.textContent = 'one-time download, ~2.3 GB';
+    downloadStatus.textContent = 'Starting download...';
+  }
+
+  downloadCard.classList.add('downloading');
+  downloadProgress.style.display = 'block';
+  downloadSteps.style.display = 'flex';
+  progressFill.style.width = '0%';
+
+  // Reset speed tracking
+  lastBytesDownloaded = 0;
+  lastSpeedTime = performance.now();
+  smoothedSpeed = 0;
+
+  let currentAsset = '';
+
+  const success = await loadLocalModel((p: LoadProgress) => {
+    const now = performance.now();
+
+    // Update progress bar
+    if (p.pct !== undefined) {
+      progressFill.style.width = `${p.pct}%`;
+    }
+
+    // Update size counter
+    if (p.bytesDownloaded !== undefined && p.totalBytesExpected) {
+      downloadSize.textContent = `${formatBytes(p.bytesDownloaded)} / ${formatBytes(p.totalBytesExpected)}`;
+
+      // Calculate speed (update every 500ms to avoid flicker)
+      const timeDelta = now - lastSpeedTime;
+      if (timeDelta > 500) {
+        const bytesDelta = p.bytesDownloaded - lastBytesDownloaded;
+        const instantSpeed = (bytesDelta / timeDelta) * 1000;
+        // Exponential moving average
+        smoothedSpeed = smoothedSpeed === 0 ? instantSpeed : smoothedSpeed * 0.7 + instantSpeed * 0.3;
+        lastBytesDownloaded = p.bytesDownloaded;
+        lastSpeedTime = now;
+
+        if (smoothedSpeed > 0 && !cached) {
+          const remaining = p.totalBytesExpected - p.bytesDownloaded;
+          downloadSpeed.textContent = `${formatSpeed(smoothedSpeed)} · ${formatEta(remaining, smoothedSpeed)}`;
+        }
+      }
+    }
+
+    // Track asset changes and update step indicators
+    if (p.asset && p.asset !== currentAsset) {
+      // Mark previous asset as complete
+      if (currentAsset) {
+        const prev = ASSET_FRIENDLY[currentAsset];
+        if (prev) {
+          prev.stepEl.classList.remove('active');
+          prev.stepEl.classList.add('complete');
+        }
+      }
+      currentAsset = p.asset;
+
+      // Mark current asset as active
+      const curr = ASSET_FRIENDLY[currentAsset];
+      if (curr) {
+        curr.stepEl.classList.add('active');
+        downloadStatus.textContent = cached
+          ? `Loading ${curr.label}...`
+          : `Downloading ${curr.label}...`;
+      }
+    }
+
+    // Handle "ready" messages (asset completed)
+    if (p.message?.includes('ready in')) {
+      const curr = ASSET_FRIENDLY[currentAsset];
+      if (curr) {
+        curr.stepEl.classList.remove('active');
+        curr.stepEl.classList.add('complete');
+      }
+    }
+  });
+
+  downloadCard.classList.remove('downloading');
+
+  if (success) {
+    // Mark all steps complete
+    [stepEncoder, stepUnet, stepVae].forEach(s => {
+      s.classList.remove('active');
+      s.classList.add('complete');
+    });
+    progressFill.style.width = '100%';
+
+    // Brief celebration before collapsing to ready state
+    downloadStatus.textContent = 'Model loaded successfully!';
+    downloadStatus.classList.add('ready');
+    downloadCard.classList.add('celebrate');
+
+    setTimeout(() => {
+      downloadCard.classList.remove('celebrate', 'from-cache');
+      showModelReady();
+    }, cached ? 800 : 1500);
+  } else {
+    downloadCard.classList.remove('from-cache');
+    downloadStatus.textContent = 'Download failed. Tap to retry.';
+    downloadStatus.classList.add('error');
+    downloadCard.classList.add('error');
+    downloadCard.addEventListener('click', retryDownload, { once: true });
+  }
+}
+
+function retryDownload() {
+  downloadCard.classList.remove('error');
+  downloadStatus.classList.remove('error');
+  [stepEncoder, stepUnet, stepVae].forEach(s => {
+    s.classList.remove('active', 'complete');
+  });
+  startModelDownload();
 }
 
 geminiModeBtn.addEventListener("click", () => {
@@ -825,33 +1010,7 @@ localModeBtn.addEventListener("click", () => {
   if (!localModeBtn.disabled) setLocalMode();
 });
 
-// Load local model button
-loadModelBtn.addEventListener("click", async () => {
-  loadModelBtn.style.display = 'none';
-  modelProgress.style.display = 'block';
-  progressFill.style.width = '0%';
-  progressText.textContent = 'Preparing...';
-
-  const success = await loadLocalModel((p: LoadProgress) => {
-    if (p.pct !== undefined) {
-      progressFill.style.width = `${p.pct}%`;
-    }
-    if (p.message) {
-      progressText.textContent = p.message;
-    }
-  });
-
-  if (success) {
-    progressFill.style.width = '100%';
-    progressText.textContent = 'Model ready!';
-    setTimeout(() => {
-      modelProgress.style.display = 'none';
-    }, 1500);
-  } else {
-    loadModelBtn.style.display = 'block';
-    modelProgress.style.display = 'none';
-  }
-});
+// Load local model - now auto-triggered by setLocalMode()
 
 // Show build timestamp (replaced at build time by Vite)
 declare const __BUILD_TIME__: string;
@@ -1041,7 +1200,7 @@ async function generateImage(prompt: string) {
 
     if (currentMode === 'local') {
       if (!localModelLoaded) {
-        alert("Local model not loaded yet. Click 'Load Model' first.");
+        alert("Local model is still downloading. Please wait for it to finish.");
         return;
       }
       transcriptDiv.textContent = `${prompt}\n\nGenerating locally...`;
