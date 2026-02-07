@@ -42,6 +42,9 @@
         <p class="api-key-hint">Get one free at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a></p>
         <input type="password" id="apiKeyInput" placeholder="Enter your Gemini API key" />
         <button id="saveApiKey">Save Key</button>
+        <p class="skip-api-key" id="skipApiKey" style="display: none">
+          <a href="#" id="skipApiKeyLink">Skip &mdash; use on-device model instead</a>
+        </p>
       </div>
 
       <!-- Main App (hidden until API key is set) -->
@@ -50,7 +53,7 @@
         <div class="model-toggle" id="modelToggle">
           <button class="model-toggle-btn active" id="geminiModeBtn" data-mode="gemini">
             <span class="mode-label">Gemini</span>
-            <span class="mode-desc">Cloud</span>
+            <span class="mode-desc" id="geminiModeDesc">Cloud</span>
           </button>
           <button class="model-toggle-btn" id="localModeBtn" data-mode="local" disabled>
             <span class="mode-label">Local</span>

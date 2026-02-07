@@ -166,6 +166,7 @@ const inputSection = document.getElementById("inputSection") as HTMLDivElement;
 
 // Model toggle elements
 const geminiModeBtn = document.getElementById("geminiModeBtn") as HTMLButtonElement;
+const geminiModeDesc = document.getElementById("geminiModeDesc") as HTMLSpanElement;
 const localModeBtn = document.getElementById("localModeBtn") as HTMLButtonElement;
 const localModeDesc = document.getElementById("localModeDesc") as HTMLSpanElement;
 const modelInfoBar = document.getElementById("modelInfoBar") as HTMLDivElement;
@@ -177,6 +178,8 @@ const progressText = document.getElementById("progressText") as HTMLParagraphEle
 const timingBadge = document.getElementById("timingBadge") as HTMLDivElement;
 const timingSource = document.getElementById("timingSource") as HTMLSpanElement;
 const timingMs = document.getElementById("timingMs") as HTMLSpanElement;
+const skipApiKey = document.getElementById("skipApiKey") as HTMLParagraphElement;
+const skipApiKeyLink = document.getElementById("skipApiKeyLink") as HTMLAnchorElement;
 
 // Template elements
 const templateSection = document.getElementById("templateSection") as HTMLDivElement;
@@ -618,50 +621,43 @@ async function printStickerSheetReliable(
   }
 }
 
-// Check if API key exists and show appropriate UI
-function checkApiKeyAndShowUI(): void {
-  const apiKey = getStoredApiKey();
-  if (apiKey) {
-    initializeAI(apiKey);
-    apiKeySetup.style.display = "none";
-    mainApp.style.display = "flex";
-    // Show record button - mic permission requested on first use
-    recordBtn.style.display = "block";
+// ========== APP INITIALIZATION ==========
+// Detects capabilities, checks API key, and decides what UI to show.
+// Key principle: users should never be blocked if their device supports local mode.
+
+function hasApiKey(): boolean {
+  return !!getStoredApiKey();
+}
+
+// Update Gemini toggle and settings button based on whether an API key is present
+function updateGeminiToggleState(): void {
+  if (hasApiKey()) {
+    geminiModeBtn.disabled = false;
+    geminiModeDesc.textContent = 'Cloud';
+    settingsBtn.textContent = 'Change API Key';
   } else {
-    apiKeySetup.style.display = "block";
-    mainApp.style.display = "none";
+    geminiModeBtn.disabled = true;
+    geminiModeDesc.textContent = 'Needs API Key';
+    settingsBtn.textContent = 'Add API Key';
   }
 }
 
-// Save API key handler
-saveApiKeyBtn.addEventListener("click", () => {
-  const apiKey = apiKeyInput.value.trim();
-  if (!apiKey) {
-    alert("Please enter an API key");
-    return;
-  }
-  setStoredApiKey(apiKey);
-  initializeAI(apiKey);
-  apiKeyInput.value = "";
-  checkApiKeyAndShowUI();
-});
+// Show the main app (hide API key setup)
+function showMainApp(): void {
+  apiKeySetup.style.display = "none";
+  mainApp.style.display = "flex";
+  recordBtn.style.display = "block";
+}
 
-// Allow Enter key to save
-apiKeyInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    saveApiKeyBtn.click();
-  }
-});
+// Show the API key setup screen (hide main app)
+function showApiKeySetup(): void {
+  apiKeySetup.style.display = "block";
+  mainApp.style.display = "none";
+  // Show skip link if device supports local
+  skipApiKey.style.display = deviceSupportsLocal ? 'block' : 'none';
+}
 
-// Settings button to change API key
-settingsBtn.addEventListener("click", () => {
-  if (confirm("Do you want to change your API key?")) {
-    clearStoredApiKey();
-    checkApiKeyAndShowUI();
-  }
-});
-
-// Device capability detection - runs on startup to gate the Local toggle
+// Device capability detection
 async function checkDeviceCapabilities(): Promise<void> {
   try {
     const caps = await detectCapabilities();
@@ -674,7 +670,6 @@ async function checkDeviceCapabilities(): Promise<void> {
       localModeDesc.textContent = 'On-Device (WebGPU)';
       modelInfoBar.querySelector('.model-name')!.textContent = 'SD-Turbo (512x512) via WebGPU';
     } else if (caps.wasm) {
-      // WASM works but is very slow for diffusion models - warn but allow
       deviceSupportsLocal = true;
       detectedBackend = 'wasm';
       localModeBtn.disabled = false;
@@ -696,8 +691,93 @@ async function checkDeviceCapabilities(): Promise<void> {
   }
 }
 
+// Main initialization — runs once on page load
+async function initApp(): Promise<void> {
+  // 1. Detect device capabilities (async — determines if local mode is viable)
+  await checkDeviceCapabilities();
+
+  // 2. Check for stored API key
+  const apiKey = getStoredApiKey();
+  if (apiKey) {
+    initializeAI(apiKey);
+  }
+
+  // 3. Update toggle states
+  updateGeminiToggleState();
+
+  // 4. Decide initial UI
+  if (apiKey) {
+    // Has API key — show app, default to Gemini
+    showMainApp();
+    setGeminiMode();
+  } else if (deviceSupportsLocal) {
+    // No API key but local works — show app, default to Local
+    showMainApp();
+    setLocalMode();
+  } else {
+    // No API key AND no local support — must get API key to proceed
+    showApiKeySetup();
+  }
+}
+
+// Save API key handler
+saveApiKeyBtn.addEventListener("click", () => {
+  const apiKey = apiKeyInput.value.trim();
+  if (!apiKey) {
+    alert("Please enter an API key");
+    return;
+  }
+  setStoredApiKey(apiKey);
+  initializeAI(apiKey);
+  apiKeyInput.value = "";
+  updateGeminiToggleState();
+  showMainApp();
+  // If currently in local mode, stay there. Otherwise default to Gemini.
+  if (currentMode !== 'local') {
+    setGeminiMode();
+  }
+});
+
+// Allow Enter key to save
+apiKeyInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    saveApiKeyBtn.click();
+  }
+});
+
+// Skip API key — go straight to local mode
+skipApiKeyLink.addEventListener("click", (e) => {
+  e.preventDefault();
+  showMainApp();
+  setLocalMode();
+});
+
+// Settings button — add or change API key
+settingsBtn.addEventListener("click", () => {
+  if (hasApiKey()) {
+    if (confirm("Do you want to change your API key?")) {
+      clearStoredApiKey();
+      ai = null;
+      updateGeminiToggleState();
+      // If on Gemini mode, switch to local (if available) or show setup
+      if (currentMode === 'gemini') {
+        if (deviceSupportsLocal) {
+          setLocalMode();
+        } else {
+          showApiKeySetup();
+        }
+      }
+    }
+  } else {
+    // No key yet — show the setup screen to add one
+    showApiKeySetup();
+  }
+});
+
 // Model toggle handlers
 function setGeminiMode() {
+  if (!hasApiKey()) return;
+
   currentMode = 'gemini';
   geminiModeBtn.classList.add('active');
   localModeBtn.classList.remove('active');
@@ -724,7 +804,9 @@ function setLocalMode() {
   }
 }
 
-geminiModeBtn.addEventListener("click", setGeminiMode);
+geminiModeBtn.addEventListener("click", () => {
+  if (!geminiModeBtn.disabled) setGeminiMode();
+});
 localModeBtn.addEventListener("click", () => {
   if (!localModeBtn.disabled) setLocalMode();
 });
@@ -756,9 +838,6 @@ loadModelBtn.addEventListener("click", async () => {
     modelProgress.style.display = 'none';
   }
 });
-
-// Run capability detection on startup
-checkDeviceCapabilities();
 
 // Show build timestamp (replaced at build time by Vite)
 declare const __BUILD_TIME__: string;
@@ -843,7 +922,7 @@ async function setupRecorder(): Promise<void> {
 }
 
 // Initialize on load
-checkApiKeyAndShowUI();
+initApp();
 
 // Start recording when button is pressed down
 recordBtn.addEventListener("pointerdown", async () => {

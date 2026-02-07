@@ -607,6 +607,21 @@ audio {
   transition: all 0.05s ease;
 }
 
+.skip-api-key {
+  margin: 15px 0 0 0;
+  font-size: 16px;
+}
+
+.skip-api-key a {
+  color: var(--dark-text);
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+
+.skip-api-key a:hover {
+  opacity: 1;
+}
+
 /* Main App Container */
 .main-app {
   display: flex;
