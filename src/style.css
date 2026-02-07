@@ -669,8 +669,13 @@ audio {
   background: var(--pastel-blue);
 }
 
-.model-toggle-btn:not(.active):hover {
+.model-toggle-btn:not(.active):not(:disabled):hover {
   background: #f5f5f5;
+}
+
+.model-toggle-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* Local Model Status */

@@ -30,6 +30,8 @@ type GenerationMode = 'gemini' | 'local';
 let currentMode: GenerationMode = 'gemini';
 let localModelLoaded = false;
 let localModelLoading = false;
+let deviceSupportsLocal = false;
+let detectedBackend: 'webgpu' | 'wasm' | null = null;
 
 // Image generation using Gemini Imagen
 const imageGen4 = "imagen-4.0-fast-generate-001";
@@ -165,6 +167,8 @@ const inputSection = document.getElementById("inputSection") as HTMLDivElement;
 // Model toggle elements
 const geminiModeBtn = document.getElementById("geminiModeBtn") as HTMLButtonElement;
 const localModeBtn = document.getElementById("localModeBtn") as HTMLButtonElement;
+const localModeDesc = document.getElementById("localModeDesc") as HTMLSpanElement;
+const modelInfoBar = document.getElementById("modelInfoBar") as HTMLDivElement;
 const localModelStatus = document.getElementById("localModelStatus") as HTMLDivElement;
 const loadModelBtn = document.getElementById("loadModelBtn") as HTMLButtonElement;
 const modelProgress = document.getElementById("modelProgress") as HTMLDivElement;
@@ -657,6 +661,41 @@ settingsBtn.addEventListener("click", () => {
   }
 });
 
+// Device capability detection - runs on startup to gate the Local toggle
+async function checkDeviceCapabilities(): Promise<void> {
+  try {
+    const caps = await detectCapabilities();
+    console.log('Device capabilities:', caps);
+
+    if (caps.webgpu) {
+      deviceSupportsLocal = true;
+      detectedBackend = 'webgpu';
+      localModeBtn.disabled = false;
+      localModeDesc.textContent = 'On-Device (WebGPU)';
+      modelInfoBar.querySelector('.model-name')!.textContent = 'SD-Turbo (512x512) via WebGPU';
+    } else if (caps.wasm) {
+      // WASM works but is very slow for diffusion models - warn but allow
+      deviceSupportsLocal = true;
+      detectedBackend = 'wasm';
+      localModeBtn.disabled = false;
+      localModeDesc.textContent = 'On-Device (Slow)';
+      modelInfoBar.querySelector('.model-name')!.textContent = 'SD-Turbo (512x512) via WASM (slow)';
+    } else {
+      deviceSupportsLocal = false;
+      detectedBackend = null;
+      localModeBtn.disabled = true;
+      localModeDesc.textContent = 'Not Supported';
+      localModeBtn.title = 'Your browser does not support WebGPU or WASM for on-device inference.';
+    }
+  } catch (error) {
+    console.error('Capability detection failed:', error);
+    deviceSupportsLocal = false;
+    localModeBtn.disabled = true;
+    localModeDesc.textContent = 'Unavailable';
+    localModeBtn.title = 'Could not detect device capabilities.';
+  }
+}
+
 // Model toggle handlers
 function setGeminiMode() {
   currentMode = 'gemini';
@@ -666,6 +705,8 @@ function setGeminiMode() {
 }
 
 function setLocalMode() {
+  if (!deviceSupportsLocal) return;
+
   currentMode = 'local';
   localModeBtn.classList.add('active');
   geminiModeBtn.classList.remove('active');
@@ -684,7 +725,9 @@ function setLocalMode() {
 }
 
 geminiModeBtn.addEventListener("click", setGeminiMode);
-localModeBtn.addEventListener("click", setLocalMode);
+localModeBtn.addEventListener("click", () => {
+  if (!localModeBtn.disabled) setLocalMode();
+});
 
 // Load local model button
 loadModelBtn.addEventListener("click", async () => {
@@ -713,6 +756,9 @@ loadModelBtn.addEventListener("click", async () => {
     modelProgress.style.display = 'none';
   }
 });
+
+// Run capability detection on startup
+checkDeviceCapabilities();
 
 // Show build timestamp (replaced at build time by Vite)
 declare const __BUILD_TIME__: string;
