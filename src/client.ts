@@ -264,29 +264,49 @@ async function createStickerSheetCanvas(
 }
 
 /**
- * Print by setting the pre-rendered image on the page's hidden print element,
- * waiting for it to fully decode, then calling window.print() directly.
- * This avoids iframes and overlays which are unreliable on iPadOS Safari.
+ * Wait for the browser to actually paint (not just schedule a paint).
+ * Double-rAF ensures one full frame has been composited.
+ */
+function waitForPaint(): Promise<void> {
+  return new Promise(resolve => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+}
+
+/**
+ * Print by pre-rendering the image off-screen so the GPU composites it,
+ * then calling window.print(). The CSS moves it on-screen in @media print.
+ *
+ * Key insight: iPadOS Safari captures the print snapshot before painting
+ * content that was display:none. By making it visible off-screen first and
+ * waiting for a real paint cycle, the image is already composited when the
+ * print snapshot is taken.
  */
 async function printDirect(blobUrl: string): Promise<void> {
-  // Set the pre-rendered image on the hidden print element
+  // Set the pre-rendered image on the print element
   printFullpageImage.src = blobUrl;
 
-  // Wait for the image to be fully decoded and ready to render
+  // Wait for the image data to be decoded
   try {
     await printFullpageImage.decode();
   } catch {
-    // decode() can fail if already decoded or on older browsers — wait as fallback
+    // decode() can fail if already decoded — wait as fallback
     await new Promise(resolve => setTimeout(resolve, 500));
   }
 
-  // Tell CSS to show the print element (guarded by body[data-print-mode])
+  // Make the print element visible off-screen (CSS positions it at left:-9999px)
+  // This forces the browser to actually lay out and paint the image
   document.body.dataset.printMode = 'active';
 
-  // Small extra delay to ensure the browser has composited the image
-  await new Promise(resolve => setTimeout(resolve, 100));
+  // Wait for two full animation frames so the GPU has composited the image
+  await waitForPaint();
+  // Extra safety margin for slower iPads
+  await new Promise(resolve => setTimeout(resolve, 200));
+  await waitForPaint();
 
-  // Print directly from the main page
+  // Now print — @media print CSS moves the element from left:-9999px to left:0
   window.print();
 
   // Clean up after printing
