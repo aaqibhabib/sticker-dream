@@ -968,22 +968,7 @@ audio {
    --print-v-pitch: vertical center-to-center distance
 */
 @media print {
-  /* Avery 22877 measurements extracted from official template:
-     ArtBox: [44.5, 44.5498, 567.5, 747.5] points (72pt = 1in)
-     - Left margin: 44.5pt = 0.618in
-     - Top margin: (792 - 747.5)pt = 0.618in
-     - Art width: 523pt = 7.26in for 3 columns
-     - Art height: 703pt = 9.76in for 4 rows
-  */
-  :root {
-    --print-top-margin: 0.618in;
-    --print-left-margin: 0.618in;
-    --print-h-pitch: 2.63in;
-    --print-v-pitch: 2.59in;
-    --label-size: 2in;
-  }
-
-  /* Hide everything except the print elements */
+  /* Hide everything except the print image */
   html, body {
     background: white !important;
     padding: 0 !important;
@@ -993,16 +978,9 @@ audio {
     overflow: hidden !important;
   }
 
-  /* Disable grid layout and hide all UI during print */
-  .main-app {
-    display: none !important;
-  }
-
-  .container {
-    display: none !important;
-  }
-
-  /* Ensure all UI elements are hidden */
+  /* Hide all UI during print */
+  .main-app,
+  .container,
   .settings-btn,
   .build-info,
   .record,
@@ -1013,8 +991,12 @@ audio {
     display: none !important;
   }
 
-  /* ========== FULL PAGE PRINT MODE ========== */
+  /* Only show print element when JS explicitly sets data-print-mode */
   .print-fullpage {
+    display: none !important;
+  }
+
+  body[data-print-mode] .print-fullpage {
     display: block !important;
     width: 8.5in !important;
     height: 11in !important;
@@ -1029,7 +1011,7 @@ audio {
     page-break-before: avoid !important;
   }
 
-  .print-fullpage-image {
+  body[data-print-mode] .print-fullpage-image {
     display: block !important;
     width: 8.5in !important;
     height: 11in !important;
@@ -1044,63 +1026,10 @@ audio {
     visibility: visible !important;
   }
 
-  /* ========== STICKER SHEET PRINT MODE ========== */
+  /* Sticker sheet is now rendered to canvas — no CSS positioning needed */
   .print-template {
-    display: block !important;
-    width: 8.5in !important;
-    height: 11in !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    background: white !important;
-    page-break-after: avoid !important;
-    page-break-inside: avoid !important;
-    page-break-before: avoid !important;
+    display: none !important;
   }
-
-  .print-grid {
-    position: relative !important;
-    width: 8.5in !important;
-    height: 11in !important;
-    display: block !important;
-  }
-
-  .print-cell {
-    position: absolute !important;
-    width: var(--label-size) !important;
-    height: var(--label-size) !important;
-    border-radius: 50% !important;
-    background-size: cover !important;
-    background-position: center !important;
-    background-repeat: no-repeat !important;
-    -webkit-print-color-adjust: exact !important;
-    color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-  }
-
-  /* Position each cell - Row 1 */
-  .print-cell[data-cell="0"] { top: var(--print-top-margin); left: var(--print-left-margin); }
-  .print-cell[data-cell="1"] { top: var(--print-top-margin); left: calc(var(--print-left-margin) + var(--print-h-pitch)); }
-  .print-cell[data-cell="2"] { top: var(--print-top-margin); left: calc(var(--print-left-margin) + var(--print-h-pitch) * 2); }
-
-  /* Position each cell - Row 2 */
-  .print-cell[data-cell="3"] { top: calc(var(--print-top-margin) + var(--print-v-pitch)); left: var(--print-left-margin); }
-  .print-cell[data-cell="4"] { top: calc(var(--print-top-margin) + var(--print-v-pitch)); left: calc(var(--print-left-margin) + var(--print-h-pitch)); }
-  .print-cell[data-cell="5"] { top: calc(var(--print-top-margin) + var(--print-v-pitch)); left: calc(var(--print-left-margin) + var(--print-h-pitch) * 2); }
-
-  /* Position each cell - Row 3 */
-  .print-cell[data-cell="6"] { top: calc(var(--print-top-margin) + var(--print-v-pitch) * 2); left: var(--print-left-margin); }
-  .print-cell[data-cell="7"] { top: calc(var(--print-top-margin) + var(--print-v-pitch) * 2); left: calc(var(--print-left-margin) + var(--print-h-pitch)); }
-  .print-cell[data-cell="8"] { top: calc(var(--print-top-margin) + var(--print-v-pitch) * 2); left: calc(var(--print-left-margin) + var(--print-h-pitch) * 2); }
-
-  /* Position each cell - Row 4 */
-  .print-cell[data-cell="9"] { top: calc(var(--print-top-margin) + var(--print-v-pitch) * 3); left: var(--print-left-margin); }
-  .print-cell[data-cell="10"] { top: calc(var(--print-top-margin) + var(--print-v-pitch) * 3); left: calc(var(--print-left-margin) + var(--print-h-pitch)); }
-  .print-cell[data-cell="11"] { top: calc(var(--print-top-margin) + var(--print-v-pitch) * 3); left: calc(var(--print-left-margin) + var(--print-h-pitch) * 2); }
 
   @page {
     margin: 0;
