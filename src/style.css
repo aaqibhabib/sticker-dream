@@ -950,7 +950,7 @@ audio {
   width: 100%;
 }
 
-/* Print Templates - Hidden on screen, shown when printing */
+/* Print Templates - Hidden on screen by default */
 .print-template,
 .print-fullpage {
   display: none;
@@ -960,15 +960,32 @@ audio {
   display: none;
 }
 
-/* Print Styles - Avery 22877 Template
-   Adjust these values to match your specific label sheet:
-   --print-top-margin: distance from page top to first label top
-   --print-left-margin: distance from page left to first label left
-   --print-h-pitch: horizontal center-to-center distance
-   --print-v-pitch: vertical center-to-center distance
-*/
+/*
+ * When JS sets data-print-mode, show the print element OFF-SCREEN on the
+ * normal display so the browser actually paints/composites the image.
+ * iPadOS Safari won't paint content that transitions from display:none
+ * inside @media print — it captures a blank snapshot.
+ */
+body[data-print-mode] .print-fullpage {
+  display: block !important;
+  position: fixed !important;
+  left: -9999px !important;
+  top: 0 !important;
+  width: 8.5in !important;
+  height: 11in !important;
+  background: white !important;
+  z-index: -1;
+}
+
+body[data-print-mode] .print-fullpage-image {
+  display: block !important;
+  width: 8.5in !important;
+  height: 11in !important;
+  object-fit: contain !important;
+}
+
+/* Print Styles */
 @media print {
-  /* Hide everything except the print image */
   html, body {
     background: white !important;
     padding: 0 !important;
@@ -991,20 +1008,21 @@ audio {
     display: none !important;
   }
 
-  /* Only show print element when JS explicitly sets data-print-mode */
+  /* Without data-print-mode, hide print elements */
   .print-fullpage {
     display: none !important;
   }
 
+  /* Move the already-painted element on-screen for the print snapshot */
   body[data-print-mode] .print-fullpage {
     display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
     width: 8.5in !important;
     height: 11in !important;
     padding: 0 !important;
     margin: 0 !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
     background: white !important;
     page-break-after: avoid !important;
     page-break-inside: avoid !important;
@@ -1026,7 +1044,7 @@ audio {
     visibility: visible !important;
   }
 
-  /* Sticker sheet is now rendered to canvas — no CSS positioning needed */
+  /* Sticker sheet is rendered to canvas — no CSS grid needed */
   .print-template {
     display: none !important;
   }
