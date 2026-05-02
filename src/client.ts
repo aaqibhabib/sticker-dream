@@ -115,8 +115,6 @@ const printFullPageBtn = document.getElementById("printFullPageBtn") as HTMLButt
 // Print template elements
 const printTemplate = document.getElementById("printTemplate") as HTMLDivElement;
 const printCells = printTemplate.querySelectorAll(".print-cell") as NodeListOf<HTMLDivElement>;
-const printFullpage = document.getElementById("printFullpage") as HTMLDivElement;
-const printFullpageImage = document.getElementById("printFullpageImage") as HTMLImageElement;
 
 // Current print mode: 'fullpage' or 'sticker'
 let currentPrintMode: 'fullpage' | 'sticker' = 'fullpage';
@@ -130,12 +128,8 @@ let isRecorderReady = false;
 // Current generated image URL
 let currentImageUrl: string | null = null;
 
-// ========== iOS-RELIABLE PRINT UTILITIES ==========
-// Uses canvas pre-rendering and dedicated print windows for iOS Safari compatibility
+// ========== PRINT / SHARE UTILITIES ==========
 
-/**
- * Load an image and return a promise that resolves when fully loaded
- */
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -146,32 +140,22 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-/**
- * Render image to canvas - ensures content is actually rendered
- * Returns a blob URL which is more reliable than data URLs on iOS
- */
-async function imageToCanvasBlob(
+async function renderCanvas(
   imageUrl: string,
   width: number,
   height: number,
   fit: 'contain' | 'cover' = 'contain'
-): Promise<string> {
+): Promise<HTMLCanvasElement> {
   const img = await loadImage(imageUrl);
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d')!;
 
-  // Fill white background
   ctx.fillStyle = 'white';
   ctx.fillRect(0, 0, width, height);
 
-  // Calculate dimensions to fit/cover
-  let drawWidth = width;
-  let drawHeight = height;
-  let offsetX = 0;
-  let offsetY = 0;
-
+  let drawWidth = width, drawHeight = height, offsetX = 0, offsetY = 0;
   const imgRatio = img.width / img.height;
   const canvasRatio = width / height;
 
@@ -188,184 +172,111 @@ async function imageToCanvasBlob(
   }
 
   ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
-
-  // Convert to blob URL (more reliable on iOS than data URL)
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) {
-        resolve(URL.createObjectURL(blob));
-      } else {
-        reject(new Error('Canvas toBlob failed'));
-      }
-    }, 'image/png');
-  });
+  return canvas;
 }
 
-/**
- * Create a sticker sheet canvas with images positioned for Avery 22877 labels
- */
 async function createStickerSheetCanvas(
   imageUrl: string,
   filledCells: number[]
-): Promise<string> {
-  // Letter size at 150 DPI for good print quality
+): Promise<HTMLCanvasElement> {
   const DPI = 150;
-  const pageWidth = 8.5 * DPI;  // 1275px
-  const pageHeight = 11 * DPI;  // 1650px
+  const pageWidth = 8.5 * DPI;
+  const pageHeight = 11 * DPI;
 
-  // Avery 22877 measurements (in inches, converted to pixels)
+  // Avery 22877 measurements
   const topMargin = 0.618 * DPI;
   const leftMargin = 0.618 * DPI;
-  const hPitch = 2.63 * DPI;  // horizontal spacing
-  const vPitch = 2.59 * DPI;  // vertical spacing
-  const labelSize = 2 * DPI;   // 2" diameter
+  const hPitch = 2.63 * DPI;
+  const vPitch = 2.59 * DPI;
+  const labelSize = 2 * DPI;
 
   const canvas = document.createElement('canvas');
   canvas.width = pageWidth;
   canvas.height = pageHeight;
   const ctx = canvas.getContext('2d')!;
 
-  // White background
   ctx.fillStyle = 'white';
   ctx.fillRect(0, 0, pageWidth, pageHeight);
 
-  // Load the sticker image
   const img = await loadImage(imageUrl);
 
-  // Draw each filled cell
   for (const cellIndex of filledCells) {
     const col = cellIndex % 3;
     const row = Math.floor(cellIndex / 3);
+    const x = leftMargin + col * hPitch;
+    const y = topMargin + row * vPitch;
 
-    const x = leftMargin + (col * hPitch);
-    const y = topMargin + (row * vPitch);
-
-    // Clip to circle
     ctx.save();
     ctx.beginPath();
     ctx.arc(x + labelSize / 2, y + labelSize / 2, labelSize / 2, 0, Math.PI * 2);
     ctx.closePath();
     ctx.clip();
-
-    // Draw image to fill the circle
     ctx.drawImage(img, x, y, labelSize, labelSize);
     ctx.restore();
   }
 
+  return canvas;
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) {
-        resolve(URL.createObjectURL(blob));
-      } else {
-        reject(new Error('Canvas toBlob failed'));
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Canvas toBlob failed')), 'image/png');
+  });
+}
+
+/**
+ * Share via iOS/Android share sheet (includes Print option), or fall back to
+ * downloading a PDF on desktop browsers that don't support file sharing.
+ */
+async function shareOrDownloadPdf(canvas: HTMLCanvasElement, filename: string): Promise<void> {
+  if (typeof navigator.canShare === 'function') {
+    const blob = await canvasToBlob(canvas);
+    const file = new File([blob], `${filename}.png`, { type: 'image/png' });
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Sticker Dream' });
+        return;
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return;
+        // Fall through to PDF on other errors
       }
-    }, 'image/png');
-  });
-}
-
-/**
- * Wait for the browser to actually paint (not just schedule a paint).
- * Double-rAF ensures one full frame has been composited.
- */
-function waitForPaint(): Promise<void> {
-  return new Promise(resolve => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => resolve());
-    });
-  });
-}
-
-/**
- * Print by pre-rendering the image off-screen so the GPU composites it,
- * then calling window.print(). The CSS moves it on-screen in @media print.
- *
- * Key insight: iPadOS Safari captures the print snapshot before painting
- * content that was display:none. By making it visible off-screen first and
- * waiting for a real paint cycle, the image is already composited when the
- * print snapshot is taken.
- */
-async function printDirect(blobUrl: string): Promise<void> {
-  // Set the pre-rendered image on the print element
-  printFullpageImage.src = blobUrl;
-
-  // Wait for the image data to be decoded
-  try {
-    await printFullpageImage.decode();
-  } catch {
-    // decode() can fail if already decoded — wait as fallback
-    await new Promise(resolve => setTimeout(resolve, 500));
+    }
   }
 
-  // Make the print element visible off-screen (CSS positions it at left:-9999px)
-  // This forces the browser to actually lay out and paint the image
-  document.body.dataset.printMode = 'active';
-
-  // Wait for two full animation frames so the GPU has composited the image
-  await waitForPaint();
-  // Extra safety margin for slower iPads
-  await new Promise(resolve => setTimeout(resolve, 200));
-  await waitForPaint();
-
-  // Now print — @media print CSS moves the element from left:-9999px to left:0
-  window.print();
-
-  // Clean up after printing
-  let cleaned = false;
-  const cleanup = () => {
-    if (cleaned) return;
-    cleaned = true;
-    delete document.body.dataset.printMode;
-    // Revoke blob URL after a delay so the print spooler can finish
-    setTimeout(() => {
-      try { URL.revokeObjectURL(blobUrl); } catch { /* ignore */ }
-    }, 10000);
-    window.removeEventListener('afterprint', cleanup);
-  };
-
-  window.addEventListener('afterprint', cleanup);
-  // Fallback: iOS Safari doesn't always fire afterprint
-  setTimeout(cleanup, 60000);
+  // Fallback: embed in a letter-sized PDF and download
+  const { jsPDF } = await import('jspdf');
+  const dataUrl = canvas.toDataURL('image/png');
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'in', format: 'letter' });
+  pdf.addImage(dataUrl, 'PNG', 0, 0, 8.5, 11);
+  pdf.save(`${filename}.pdf`);
 }
 
-/**
- * Main print function for full page mode
- */
 async function printFullPageReliable(imageUrl: string): Promise<void> {
-  console.log('🖨️ Preparing full page print...');
-
+  console.log('🖨️ Preparing full page...');
   try {
-    // Render to canvas at letter size (8.5 x 11 inches at 150 DPI)
-    const blobUrl = await imageToCanvasBlob(imageUrl, 1275, 1650, 'contain');
-    console.log('✅ Canvas rendered, printing...');
-    await printDirect(blobUrl);
+    const canvas = await renderCanvas(imageUrl, 1275, 1650, 'contain');
+    await shareOrDownloadPdf(canvas, 'sticker');
   } catch (error) {
-    console.error('Print preparation failed:', error);
-    alert('Failed to prepare print. Please try again.');
+    console.error('Export failed:', error);
+    alert('Failed to prepare. Please try again.');
   }
 }
 
-/**
- * Main print function for sticker sheet mode
- */
 async function printStickerSheetReliable(
   imageUrl: string,
   filledCells: number[]
 ): Promise<void> {
-  console.log('🖨️ Preparing sticker sheet print...');
-
+  console.log('🖨️ Preparing sticker sheet...');
   if (filledCells.length === 0) {
     alert('Please fill at least one cell before printing.');
     return;
   }
-
   try {
-    // Render sticker sheet to a single composite canvas image
-    const blobUrl = await createStickerSheetCanvas(imageUrl, filledCells);
-    console.log('✅ Sticker sheet rendered, printing...');
-    await printDirect(blobUrl);
+    const canvas = await createStickerSheetCanvas(imageUrl, filledCells);
+    await shareOrDownloadPdf(canvas, 'sticker-sheet');
   } catch (error) {
-    console.error('Print preparation failed:', error);
-    alert('Failed to prepare print. Please try again.');
+    console.error('Export failed:', error);
+    alert('Failed to prepare. Please try again.');
   }
 }
 
@@ -611,9 +522,8 @@ async function generateImage(prompt: string) {
     imageDisplay.src = imageUrl;
     imageDisplay.style.display = "block";
 
-    // Set up full page images
+    // Set up full page preview
     fullpageImage.src = imageUrl;
-    printFullpageImage.src = imageUrl;
 
     // Show template section with full page mode as default
     templateSection.style.display = "flex";
