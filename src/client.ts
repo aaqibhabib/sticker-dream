@@ -1,5 +1,5 @@
 import { pipeline } from "@huggingface/transformers";
-import { GoogleGenAI, SafetyFilterLevel } from "@google/genai";
+import { GoogleGenAI, HarmBlockThreshold, HarmCategory } from "@google/genai";
 
 // API Key Management
 const API_KEY_STORAGE_KEY = "sticker-dream-gemini-api-key";
@@ -23,8 +23,8 @@ function initializeAI(apiKey: string): void {
   ai = new GoogleGenAI({ apiKey });
 }
 
-// Image generation using Gemini Imagen
-const imageGen4 = "imagen-4.0-fast-generate-001";
+// Image generation using Gemini (Nano Banana). Imagen 4 shut down 2026-08-17.
+const imageGenModel = "gemini-3.1-flash-lite-image";
 
 async function generateImageWithGemini(prompt: string): Promise<string | null> {
   if (!ai) {
@@ -34,9 +34,9 @@ async function generateImageWithGemini(prompt: string): Promise<string | null> {
   console.log(`🎨 Generating image: "${prompt}"`);
   console.time("generation");
 
-  const response = await ai.models.generateImages({
-    model: imageGen4,
-    prompt: `A simple black and white kids coloring page sticker design.
+  const response = await ai.models.generateContent({
+    model: imageGenModel,
+    contents: `A simple black and white kids coloring page sticker design.
     Style: very simple, bold thick outlines, minimal details, large shapes, easy to color.
     Perfect for small 2 inch round stickers.
     <image-description>
@@ -46,20 +46,20 @@ async function generateImageWithGemini(prompt: string): Promise<string | null> {
 
     Keep it simple with thick bold lines and large clear shapes. Minimal fine details.`,
     config: {
-      numberOfImages: 1,
-      aspectRatio: "1:1", // Square for round labels
-      safetyFilterLevel: SafetyFilterLevel.BLOCK_LOW_AND_ABOVE
+      responseModalities: ["IMAGE"],
+      imageConfig: { aspectRatio: "1:1" }, // Square for round labels
+      safetySettings: [
+        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
+        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
+        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
+        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
+      ],
     },
   });
 
   console.timeEnd("generation");
 
-  if (!response.generatedImages || response.generatedImages.length === 0) {
-    console.error("No images generated");
-    return null;
-  }
-
-  const imgBytes = response.generatedImages[0].image?.imageBytes;
+  const imgBytes = response.data;
   if (!imgBytes) {
     console.error("No image bytes returned");
     return null;
